@@ -1,0 +1,99 @@
+我自己的环境是ubuntu 13.04,64位,双系统
+所有命令都是root下做的就不用说了.
+
+sudo su
+[password]
+
+安装非调试版本的bochs:
+
+apt-get install bochs
+apt-get install bochs-x
+apt-get install bochs-sdl
+
+编译调试版本的bochs:
+1. 下载源文件,
+//我用的是最新版,地址http://bochs.sourceforge.net/getcurrent.html
+2. 下载必要工具
+
+apt-get install build-essential
+apt-get install xorg-dev
+apt-get install bison
+apt-get install libgtk2.0-dev
+
+注,中间如果出现了包依赖,大家就自己谷歌一下
+我的解决方案是用的apt-get install aptitude
+然后 aptitude install [package-name] 
+aptitude会在冲突时提供解决方案,如果按n是下一个,如果第一个解决方案不行就用下一个吧.
+
+3. 安装
+进入bochs源代码目录 输入
+
+./configure --with-x11 --with-wx --enable-debugger --enable-disasm --enable-all-optimizations --enable-readline --enable-debugger-gui
+
+注: 这个地方选项很多可以自行增删,虽然我大概也都不知道是什么意思,不过--enable-debugger --enable-disasm是必需的. 以上只是给出我的配置
+
+然后输入
+make
+然后输入
+make install
+然后看看你的/usr/local/bin里看看有没有bochs么.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+./configure --with-x11 --with-wx --enable-debugger --enable-disasm --enable-all-optimizations --enable-readline --enable-long-phy-address --enable-debugger-gui
+
+./configure --enable-cpu-level=6 --enable-disasm    --enable-debugger --enable-iodebug --enable-instrumentation --enable-4meg-pages --enable-global-pages    --enable-all-optimizations --with-all-libs  --enable-long-phy-address --enable-x86-64.
+
+
+
+g++ -c -I/usr/include/gtk-3.0 -I.. -I./.. -I../iodev -I./../iodev -I../instrument/stubs -I./../instrument/stubs -I/usr/include/glib-2.0 -g -O2 -shared `pkg-config --cflags --libs glib-2.0` `pkg-config --cflags --libs gtk+-2.0` -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES     gtk_enh_dbg_osdep.cc -o gtk_enh_dbg_osdep.o
+
+
+
+
+./configure --with-x11 --with-wx --enable-debugger --enable-disasm --enable-all-optimizations --enable-readline --enable-debugger-gui
+
+
