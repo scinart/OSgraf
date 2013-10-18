@@ -742,4 +742,3 @@ keyboard_mapping: enabled=0, map=gui/keymaps/x11-pc-us.map
 # romimage: file=:bios:BIOS-bochs-latest
 # floppya: 1_44=[fd:], status=inserted
 #=======================================================================
-display_library: sdl
