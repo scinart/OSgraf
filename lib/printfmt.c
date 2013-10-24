@@ -216,7 +216,7 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 				putch('-', putdat);
 				num = -(long long) num;
 			}
-			base = 10;
+			base = 8;
 			goto number;
 
 		// pointer
