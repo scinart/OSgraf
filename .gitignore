@@ -1,0 +1,6 @@
+# ignore ignore .gitignore
+# .gitignore
+# ignore *.o *.a
+*.[oa]
+# ignore obj/
+obj/
