@@ -53,8 +53,8 @@ runbochs () {
 
 
 
-gmake
-runbochs
+make
+bochs
 
 score=0
 
