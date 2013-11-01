@@ -29,23 +29,23 @@ start:          .code16                         # This runs in real mode
         movw    %ax,%ss                 # -> Stack Segment
 
 ###############################################################################
-# Call BIOS INTERRUPT TO OUTPUT CHARACTERS
+# Call BIOS INTERRUPT TO OUTPUT NAMES
 #
+#       call    clear_screen
+#       movw    $namestr,%ax
+#       movw    %ax,    %bp
+#       movw    $44,    %cx
+#       movb    $0x13,  %ah
+#       movb    $0,     %al
+#       movb    $0x04,  %bl
+#       movb    $0x0,   %bh
+#       movb    $0x02,  %dh
+#       movb    $0x04,  %dl
+#       int     $0x10
+#	xorw    %ax, %ax
+#       int     $0x16
 ###############################################################################
-        call    clear_screen
-        movw    $namestr,%ax
-        movw    %ax,    %bp
-        movw    $44,    %cx
-        movb    $0x13,  %ah
-        movb    $0,     %al
-        movb    $0x04,  %bl
-        movb    $0x0,   %bh
-        movb    $0x02,  %dh
-        movb    $0x04,  %dl
-        int     $0x10
-	xorw    %ax, %ax
-        int     $0x16
-
+	
         # Set up the important data segment registers (DS, ES, SS).
         xorw    %ax,%ax                 # Segment number zero
         movw    %ax,%ds                 # -> Data Segment
