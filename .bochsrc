@@ -722,7 +722,7 @@ keyboard_mapping: enabled=0, map=gui/keymaps/x11-pc-us.map
 # Enable GDB stub. See user documentation for details.
 # Default value is enabled=0.
 #=======================================================================
-#gdbstub: enabled=0, port=1234, text_base=0, data_base=0, bss_base=0
+#gdbstub: enabled=1, port=1234, text_base=0, data_base=0, bss_base=0
 
 #=======================================================================
 # IPS:
