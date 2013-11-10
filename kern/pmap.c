@@ -115,7 +115,14 @@ boot_alloc(uint32_t n, uint32_t align)
 	//	Step 3: increase boot_freemem to record allocation
 	//	Step 4: return allocated chunk
 
-	return NULL;
+	//step1
+	boot_freemem = ROUNDUP(boot_freemem, align);//首先是把地址向上移到align对齐的地方开始
+	//step2
+	v = boot_freemem;//记录下起始地址，用于返回
+	//step3
+	boot_freemem += n;//把boot_fremem上移到结束的地址
+	//step4
+	return v;//把起始地址返回
 }
 
 //
@@ -145,7 +152,22 @@ boot_alloc(uint32_t n, uint32_t align)
 static pte_t*
 boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 {
-	return 0;
+	pte_t *p;
+	pte_t *addr;
+	pgdir = &pgdir[PDX(la)];
+	if(!(*pgdir & PTE_P)){
+		if(!create) return 0;
+		else{
+		addr = boot_alloc(PGSIZE, PGSIZE);
+		*pgdir = (PTE_ADDR(PADDR(addr))|PTE_P|PTE_W|PTE_U);
+		p = (pte_t *)(KADDR(PTE_ADDR(*pgdir)));
+		return &p[PTX(la)];
+		}
+	}
+	else{
+		p = (pte_t* )(KADDR(PTE_ADDR(*pgdir)));
+		return &p[PTX(la)];
+	}
 }
 
 //
@@ -159,6 +181,12 @@ boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 static void
 boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int perm)
 {
+	pte_t *addr, *p;
+	int i;
+	for(i = 0; i < size; i += PGSIZE){
+		addr = boot_pgdir_walk(pgdir, la + i, 1);
+		*addr |= (PTE_ADDR(pa + i) | perm);
+	}
 }
 
 // Set up a two-level page table:
@@ -181,7 +209,7 @@ i386_vm_init(void)
 	size_t n;
 
 	// Remove this line when you're ready to test this function.
-	panic("i386_vm_init: This function is not finished\n");
+	//panic("i386_vm_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -211,7 +239,7 @@ i386_vm_init(void)
 	//     * [KSTACKTOP-PTSIZE, KSTACKTOP-KSTKSIZE) -- not backed => faults
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-
+	boot_map_segment(pgdir, KSTACKTOP -  KSTKSIZE, KSTKSIZE, PADDR(bootstack),  PTE_W|PTE_P);
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE. 
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -220,7 +248,10 @@ i386_vm_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here: 
-
+	cprintf("\nmap kernel\n");
+	boot_map_segment(pgdir, KERNBASE, (0xFFFFFFFF)-KERNBASE + 1, 0, PTE_W|PTE_P);
+	cprintf("size = %u\n",(0xFFFFFFFF)-KERNBASE);
+	cprintf("\nout kernel map\n");
 	//////////////////////////////////////////////////////////////////////
 	// Make 'pages' point to an array of size 'npage' of 'struct Page'.
 	// The kernel uses this structure to keep track of physical pages;
@@ -233,7 +264,9 @@ i386_vm_init(void)
 	//    - pages -- kernel RW, user NONE
 	//    - the read-only version mapped at UPAGES -- kernel R, user R
 	// Your code goes here: 
-
+	pages = boot_alloc(npage *  sizeof(struct Page),  PGSIZE);
+	boot_map_segment(pgdir, UPAGES, npage * sizeof(struct Page),\
+             PADDR(pages), PTE_U | PTE_P);
 	// Check that the initial page directory has been set up correctly.
 	check_boot_pgdir();
 
@@ -392,6 +425,16 @@ page_init(void)
 		pages[i].pp_ref = 0;
 		LIST_INSERT_HEAD(&page_free_list, &pages[i], pp_link);
 	}
+	pages[0].pp_ref = 1;//把page 0引用次数置1
+	LIST_REMOVE(&pages[0],pp_link);//把page 0从空闲页表中删除
+	for(i = IOPHYSMEM; i < EXTPHYSMEM; i += PGSIZE){//把从IOPHYSMEM到EXTPHYSMEM间的页面标志为已用
+		pages[i / PGSIZE].pp_ref = 1;
+		LIST_REMOVE(&pages[i / PGSIZE], pp_link);
+	}
+	for(i = EXTPHYSMEM; i < PADDR((unsigned int)boot_freemem); i += PGSIZE){//把其它的已经使用的页面拿标志出来。这个其实可以和上面的合并
+		pages[i / PGSIZE].pp_ref = 1;
+		LIST_REMOVE(&pages[i / PGSIZE], pp_link);
+	}
 }
 
 //
@@ -423,7 +466,13 @@ int
 page_alloc(struct Page **pp_store)
 {
 	// Fill this function in
-	return -E_NO_MEM;
+	if(LIST_FIRST(&page_free_list) == NULL)//没有空闲页了,返回_E_NO_MEM
+		return -E_NO_MEM;
+	else{
+		*pp_store = LIST_FIRST(&page_free_list);
+		LIST_REMOVE(*pp_store,pp_link);
+		return 0;
+	}
 }
 
 //
@@ -434,6 +483,13 @@ void
 page_free(struct Page *pp)
 {
 	// Fill this function in
+	if(pp->pp_ref != 0)
+		return;
+	else{
+		page_initpp(pp);//把空闲页清0
+		LIST_INSERT_HEAD(&page_free_list, pp, pp_link);//因为我们alloc是从头开始alloc的，所以remove的时候我们也从头开始加
+		return;
+	}
 }
 
 //
@@ -466,7 +522,20 @@ pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Fill this function in
-	return NULL;
+	struct Page *page_tmp;
+	pte_t *pt;//页表地址
+	pgdir = (pde_t *)&pgdir[PDX(va)];
+	if(!(*pgdir & PTE_P)){
+		if (create == 0)
+			return NULL;
+		if (page_alloc(&page_tmp) < 0)//page_tmp指向页表的入口
+			return NULL;
+		page_tmp->pp_ref = 1;
+		memset(KADDR(page2pa(page_tmp)), 0, PGSIZE);//把所申请的这一页清0
+		*pgdir = page2pa(page_tmp) | PTE_U | PTE_W |PTE_P;//这个地方为什么没有直接return page_tmp呢，因为需要加上一些页面属性
+	}
+	pt = (pte_t *)KADDR(PTE_ADDR(*pgdir));//4k页对齐后，变换成虚拟地址
+	return &pt[PTX(va)];//找到相应页表所在地址
 }
 
 //
@@ -492,7 +561,27 @@ int
 page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm) 
 {
 	// Fill this function in
-	return 0;
+	cprintf("page_insert\r\n");   
+	pte_t* pte;  
+	struct Page* pg=page_lookup(pgdir,va,NULL);  
+	if(pg==pp)  
+	{  
+		pte=pgdir_walk(pgdir,va,1);  
+		pte[0]=page2pa(pp)|perm|PTE_P;  
+		return 0;  
+	}  
+	else if(pg!=NULL )  
+	{  
+		page_remove(pgdir,va);  
+	}  
+	pte=pgdir_walk(pgdir,va,1);  
+	if(pte==NULL)  
+	{  
+		return -E_NO_MEM;  
+	}  
+	pte[0]=page2pa(pp)|perm|PTE_P;  
+	pp->pp_ref++;  
+	return 0;  
 }
 
 //
@@ -509,7 +598,25 @@ struct Page *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	// Fill this function in
-	return NULL;
+	cprintf("page_lookup\r\n");  
+	pte_t* pte=pgdir_walk(pgdir,va,0);  
+	if(pte==NULL)  
+	{  
+		return NULL;  
+	}  
+	if(pte_store!=0)  
+	{  
+		*pte_store=pte;  
+	}  
+	if(pte[0] !=(pte_t)NULL)  
+	{  
+		cprintf("%x \r\n",pte[PTX(va)]);  
+		return pa2page(PTE_ADDR(pte[0]));  
+	}  
+	else  
+	{  
+		return NULL;  
+	}  
 }
 
 //
@@ -531,6 +638,15 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
+	cprintf("page_remove\r\n");  
+	pte_t* pte=0;  
+	struct Page* page=page_lookup(pgdir,va,&pte);  
+	if(page!=NULL)  
+	{  
+		page_decref(page);  
+	}  
+	pte[0]=0;  
+	tlb_invalidate(pgdir,va);
 }
 
 //
