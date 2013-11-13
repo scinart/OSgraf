@@ -215,6 +215,9 @@ segment_alloc(struct Env *e, void *va, size_t len)
 //
 // Finally, this function maps one page for the program's initial stack.
 //
+// load_icode panics if it encounters problems.
+//  - How might load_icode fail?  What might be wrong with the given input?
+//
 static void
 load_icode(struct Env *e, uint8_t *binary, size_t size)
 {
@@ -249,10 +252,82 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 
 	// LAB 3: Your code here.
 
+	// Add by hldyxh @ 2009-10-09
+        struct Elf *elf = (struct Elf *)binary;
+        uint8_t* va = NULL;
+        uint8_t* origin_va = NULL;
+        int page_num = 0;
+        int byte_num = 0;
+        int copyed_byte = 0;
+        int filesz = 0;
+        int memsz = 0;
+        int offset = 0;
+
+        struct Proghdr *ph, *eph;
+        int i,j;
+        struct Page *p;
+        pte_t* pte;
+
+        if(elf->e_magic != ELF_MAGIC)
+                panic("elf->e_magic erro\n");
+
+        // program header
+        ph = (struct Proghdr *)(binary + elf->e_phoff);
+        // one after last program header
+        eph = ph + elf->e_phnum;
+
+        // For each program header, load it into memory, zeroing as necessary
+        for(; ph < eph; ph++)
+        {
+                if(ph->p_type == ELF_PROG_LOAD)
+                {
+                         // map segment
+                        segment_alloc(e, (uintptr_t *)(ph->p_va), ph->p_memsz);
+                        pte =(pte_t*)KADDR(PTE_ADDR(e->env_pgdir[PDX(ph->p_va)]));
+
+                        origin_va = (uint8_t*)ROUNDDOWN(ph->p_va, PGSIZE);
+                        offset = ph->p_va - (int)origin_va;
+                        page_num = ROUNDUP(ph->p_filesz + offset, PGSIZE) / PGSIZE;
+                        copyed_byte = 0;
+                        filesz = ph->p_filesz;
+
+                        for (j = 0; j < page_num; j++)
+                        {
+                                va = (uint8_t *)(KADDR(PTE_ADDR(pte[PTX(origin_va)])) + offset);
+                                origin_va += PGSIZE;
+
+                                if ((filesz + offset) > PGSIZE)
+                                {
+                                        filesz -= PGSIZE - offset;
+                                        byte_num = PGSIZE - offset;
+                                }
+                                else
+                                {
+                                        byte_num = filesz;
+                                }
+
+                                offset = 0;
+                                memcpy(va, binary + ph->p_offset + copyed_byte, byte_num);
+                                copyed_byte += byte_num;
+                        }
+                        if (copyed_byte != ph->p_filesz)
+                                panic("Load_icode failed\n");
+                }
+        }
+
+        // Set up the environment's trapframe to point to the right location
+        // Other values for the trap frame as assigned in env_alloc
+        e->env_tf.tf_eip = elf->e_entry;
+
+        // Add end
+
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+        //      Add by hldyxh @ 2009-10-09
+        segment_alloc(e,(uintptr_t*)(USTACKTOP - PGSIZE),PGSIZE);
+        // Add end
 }
 
 //
@@ -261,6 +336,10 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 // before running the first user-mode environment.
 // The new env's parent ID is set to 0.
 //
+// Where does the result go? 
+// By convention, envs[0] is the first environment allocated, so
+// whoever calls env_create simply looks for the newly created
+// environment there. 
 void
 env_create(uint8_t *binary, size_t size)
 {
