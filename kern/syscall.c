@@ -21,7 +21,8 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 	
 	// LAB 3: Your code here.
-
+	user_mem_assert(curenv, (void *)s, len, PTE_U);
+	//cprintf("curenv: %x\ncurenv->env-pgdir: %x\n%x\n", curenv, curenv->env_pgdir,*(curenv->env_pgdir));
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
 }
@@ -79,28 +80,49 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
 
-	panic("syscall not implemented");
-
-        int ret = 0;
-        void* func = NULL;
-	//	To help you finish this job,TA has write part of the code
-	//	Now you just have to set the pointer func to the write function
-
-        asm volatile("push %%esi\n"
-                "push %%edi\n"
-                "push %%ebx\n"
-                "push %%ecx\n"
-                "push %%edx\n"
-                "call *%1\n"
-                : "=a" (ret)
-                : "m" (func),
-                  "d" (a1),
-                  "c" (a2),
-                  "b" (a3),
-                  "D" (a4),
-                  "S" (a5)
-                : "cc", "memory");
+        int32_t ret = 0;
+	
+        switch (syscallno) {
+        case SYS_cputs:
+                sys_cputs((char *)a1, (size_t)a2);
+                break;
+        case SYS_cgetc:
+                ret = sys_cgetc();
+                break;
+        case SYS_getenvid:
+                ret = sys_getenvid();
+                break;
+        case SYS_env_destroy:
+                ret = sys_env_destroy((envid_t)a1);
+                break;
+        default:
+                return -E_INVAL;
+        }
 
         return ret;
 }
+// //	panic("syscall not implemented");
+
+//         int ret = 0;
+//         void* func = NULL;
+// 	//	To help you finish this job,TA has write part of the code
+// 	//	Now you just have to set the pointer func to the write function
+
+//         asm volatile("push %%esi\n"
+//                 "push %%edi\n"
+//                 "push %%ebx\n"
+//                 "push %%ecx\n"
+//                 "push %%edx\n"
+//                 "call *%1\n"
+//                 : "=a" (ret)
+//                 : "m" (func),
+//                   "d" (a1),
+//                   "c" (a2),
+//                   "b" (a3),
+//                   "D" (a4),
+//                   "S" (a5)
+//                 : "cc", "memory");
+
+//         return ret;
+// }
 

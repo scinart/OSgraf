@@ -122,8 +122,8 @@ distclean: realclean
 	rm -rf conf/gcc.mk
 
 grade: $(LABSETUP)grade.sh
-	$(V)$(MAKE) clean >/dev/null 2>/dev/null
-	$(MAKE) all
+	#$(V)$(MAKE) clean >/dev/null 2>/dev/null
+	#$(MAKE) all
 	sh $(LABSETUP)grade.sh
 
 handin: tarball

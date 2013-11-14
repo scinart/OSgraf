@@ -29,37 +29,37 @@ static struct Env_list env_free_list;	// Free list
 int
 envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 {
-	struct Env *e;
+    struct Env *e;
 
-	// If envid is zero, return the current environment.
-	if (envid == 0) {
-		*env_store = curenv;
-		return 0;
-	}
-
-	// Look up the Env structure via the index part of the envid,
-	// then check the env_id field in that struct Env
-	// to ensure that the envid is not stale
-	// (i.e., does not refer to a _previous_ environment
-	// that used the same slot in the envs[] array).
-	e = &envs[ENVX(envid)];
-	if (e->env_status == ENV_FREE || e->env_id != envid) {
-		*env_store = 0;
-		return -E_BAD_ENV;
-	}
-
-	// Check that the calling environment has legitimate permission
-	// to manipulate the specified environment.
-	// If checkperm is set, the specified environment
-	// must be either the current environment
-	// or an immediate child of the current environment.
-	if (checkperm && e != curenv && e->env_parent_id != curenv->env_id) {
-		*env_store = 0;
-		return -E_BAD_ENV;
-	}
-
-	*env_store = e;
+    // If envid is zero, return the current environment.
+    if (envid == 0) {
+	*env_store = curenv;
 	return 0;
+    }
+
+    // Look up the Env structure via the index part of the envid,
+    // then check the env_id field in that struct Env
+    // to ensure that the envid is not stale
+    // (i.e., does not refer to a _previous_ environment
+    // that used the same slot in the envs[] array).
+    e = &envs[ENVX(envid)];
+    if (e->env_status == ENV_FREE || e->env_id != envid) {
+	*env_store = 0;
+	return -E_BAD_ENV;
+    }
+
+    // Check that the calling environment has legitimate permission
+    // to manipulate the specified environment.
+    // If checkperm is set, the specified environment
+    // must be either the current environment
+    // or an immediate child of the current environment.
+    if (checkperm && e != curenv && e->env_parent_id != curenv->env_id) {
+	*env_store = 0;
+	return -E_BAD_ENV;
+    }
+
+    *env_store = e;
+    return 0;
 }
 
 //
@@ -71,7 +71,15 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 void
 env_init(void)
 {
-	// LAB 3: Your code here.
+    // LAB 3: Your code here.
+    LIST_INIT(&env_free_list);
+    int i;
+    for (i=NENV-1; i>=0; i--) {
+	envs[i].env_id = 0;
+	envs[i].env_runs = 0;
+	envs[i].env_status = ENV_FREE;
+	LIST_INSERT_HEAD(&env_free_list, &envs[i], env_link);
+    }
 }
 
 //
@@ -87,36 +95,51 @@ env_init(void)
 static int
 env_setup_vm(struct Env *e)
 {
-	int i, r;
-	struct Page *p = NULL;
+    int i, r;
+    struct Page *p = NULL;
 
-	// Allocate a page for the page directory
-	if ((r = page_alloc(&p)) < 0)
-		return r;
+    // Allocate a page for the page directory
+    if ((r = page_alloc(&p)) < 0)
+	return r;
 
-	// Now, set e->env_pgdir and e->env_cr3,
-	// and initialize the page directory.
-	//
-	// Hint:
-	//    - The VA space of all envs is identical above UTOP
-	//      (except at VPT and UVPT, which we've set below).
-	//	See inc/memlayout.h for permissions and layout.
-	//	Can you use boot_pgdir as a template?  Hint: Yes.
-	//	(Make sure you got the permissions right in Lab 2.)
-	//    - The initial VA below UTOP is empty.
-	//    - You do not need to make any more calls to page_alloc.
-	//    - Note: pp_ref is not maintained for most physical pages
-	//	mapped above UTOP -- but you do need to increment
-	//	env_pgdir's pp_ref!
+    // Now, set e->env_pgdir and e->env_cr3,
+    // and initialize the page directory.
+    //
+    // Hint:
+    //    - The VA space of all envs is identical above UTOP
+    //      (except at VPT and UVPT, which we've set below).
+    //	See inc/memlayout.h for permissions and layout.
+    //	Can you use boot_pgdir as a template?  Hint: Yes.
+    //	(Make sure you got the permissions right in Lab 2.)
+    //    - The initial VA below UTOP is empty.
+    //    - You do not need to make any more calls to page_alloc.
+    //    - Note: pp_ref is not maintained for most physical pages
+    //	mapped above UTOP -- but you do need to increment
+    //	env_pgdir's pp_ref!
 
-	// LAB 3: Your code here.
+    // LAB 3: Your code here.
+    //version 1
+    // memset(page2kva(p), 0, PGSIZE);
+    // e->env_pgdir = page2kva(p);
+    // e->env_cr3 = page2pa(p);
+    // p->pp_ref ++;
+    // for (i=PDX(UTOP); i<NPDENTRIES; i++)
+    // 	e->env_pgdir[i] = boot_pgdir[i];
+    //version 2
+    p->pp_ref++;
+    e->env_pgdir = page2kva(p);
+    e->env_cr3 = PADDR(e->env_pgdir);
+    memset(e->env_pgdir, 0, PDX(UTOP) * 4);
+    memmove(e->env_pgdir + PDX(UTOP), boot_pgdir + PDX(UTOP),
+           PGSIZE - PDX(UTOP) * 4);
 
-	// VPT and UVPT map the env's own page table, with
-	// different permissions.
-	e->env_pgdir[PDX(VPT)]  = e->env_cr3 | PTE_P | PTE_W;
-	e->env_pgdir[PDX(UVPT)] = e->env_cr3 | PTE_P | PTE_U;
 
-	return 0;
+    // VPT and UVPT map the env's own page table, with
+    // different permissions.
+    e->env_pgdir[PDX(VPT)]  = e->env_cr3 | PTE_P | PTE_W;
+    e->env_pgdir[PDX(UVPT)] = e->env_cr3 | PTE_P | PTE_U;
+
+    return 0;
 }
 
 //
@@ -130,52 +153,52 @@ env_setup_vm(struct Env *e)
 int
 env_alloc(struct Env **newenv_store, envid_t parent_id)
 {
-	int32_t generation;
-	int r;
-	struct Env *e;
+    int32_t generation;
+    int r;
+    struct Env *e;
 
-	if (!(e = LIST_FIRST(&env_free_list)))
-		return -E_NO_FREE_ENV;
+    if (!(e = LIST_FIRST(&env_free_list)))
+	return -E_NO_FREE_ENV;
 
-	// Allocate and set up the page directory for this environment.
-	if ((r = env_setup_vm(e)) < 0)
-		return r;
+    // Allocate and set up the page directory for this environment.
+    if ((r = env_setup_vm(e)) < 0)
+	return r;
 
-	// Generate an env_id for this environment.
-	generation = (e->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
-	if (generation <= 0)	// Don't create a negative env_id.
-		generation = 1 << ENVGENSHIFT;
-	e->env_id = generation | (e - envs);
+    // Generate an env_id for this environment.
+    generation = (e->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
+    if (generation <= 0)	// Don't create a negative env_id.
+	generation = 1 << ENVGENSHIFT;
+    e->env_id = generation | (e - envs);
 	
-	// Set the basic status variables.
-	e->env_parent_id = parent_id;
-	e->env_status = ENV_RUNNABLE;
-	e->env_runs = 0;
+    // Set the basic status variables.
+    e->env_parent_id = parent_id;
+    e->env_status = ENV_RUNNABLE;
+    e->env_runs = 0;
 
-	// Clear out all the saved register state,
-	// to prevent the register values
-	// of a prior environment inhabiting this Env structure
-	// from "leaking" into our new environment.
-	memset(&e->env_tf, 0, sizeof(e->env_tf));
+    // Clear out all the saved register state,
+    // to prevent the register values
+    // of a prior environment inhabiting this Env structure
+    // from "leaking" into our new environment.
+    memset(&e->env_tf, 0, sizeof(e->env_tf));
 
-	// Set up appropriate initial values for the segment registers.
-	// GD_UD is the user data segment selector in the GDT, and 
-	// GD_UT is the user text segment selector (see inc/memlayout.h).
-	// The low 2 bits of each segment register contains the
-	// Requestor Privilege Level (RPL); 3 means user mode.
-	e->env_tf.tf_ds = GD_UD | 3;
-	e->env_tf.tf_es = GD_UD | 3;
-	e->env_tf.tf_ss = GD_UD | 3;
-	e->env_tf.tf_esp = USTACKTOP;
-	e->env_tf.tf_cs = GD_UT | 3;
-	// You will set e->env_tf.tf_eip later.
+    // Set up appropriate initial values for the segment registers.
+    // GD_UD is the user data segment selector in the GDT, and 
+    // GD_UT is the user text segment selector (see inc/memlayout.h).
+    // The low 2 bits of each segment register contains the
+    // Requestor Privilege Level (RPL); 3 means user mode.
+    e->env_tf.tf_ds = GD_UD | 3;
+    e->env_tf.tf_es = GD_UD | 3;
+    e->env_tf.tf_ss = GD_UD | 3;
+    e->env_tf.tf_esp = USTACKTOP;
+    e->env_tf.tf_cs = GD_UT | 3;
+    // You will set e->env_tf.tf_eip later.
 
-	// commit the allocation
-	LIST_REMOVE(e, env_link);
-	*newenv_store = e;
+    // commit the allocation
+    LIST_REMOVE(e, env_link);
+    *newenv_store = e;
 
-	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
-	return 0;
+    cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+    return 0;
 }
 
 //
@@ -188,12 +211,22 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 static void
 segment_alloc(struct Env *e, void *va, size_t len)
 {
-	// LAB 3: Your code here.
-	// (But only if you need it for load_icode.)
-	//
-	// Hint: It is easier to use segment_alloc if the caller can pass
-	//   'va' and 'len' values that are not page-aligned.
-	//   You should round va down, and round len up.
+    // LAB 3: Your code here.
+    // (But only if you need it for load_icode.)
+    //
+    // Hint: It is easier to use segment_alloc if the caller can pass
+    //   'va' and 'len' values that are not page-aligned.
+    //   You should round va down, and round len up.
+    void *aligned_va = ROUNDDOWN(va, PGSIZE);
+    size_t i, aligned_len = ROUNDUP(len, PGSIZE);
+    struct Page *page;
+        
+    for (i=0; i<aligned_len; i+=PGSIZE) {
+	if (-E_NO_MEM == page_alloc(&page)) {
+	    panic("No memory\n");
+	}
+	page_insert(e->env_pgdir, page, aligned_va+i, PTE_U | PTE_W);
+    }
 }
 
 //
@@ -221,114 +254,115 @@ segment_alloc(struct Env *e, void *va, size_t len)
 static void
 load_icode(struct Env *e, uint8_t *binary, size_t size)
 {
-	// Hints: 
-	//  Load each program segment into virtual memory
-	//  at the address specified in the ELF section header.
-	//  You should only load segments with ph->p_type == ELF_PROG_LOAD.
-	//  Each segment's virtual address can be found in ph->p_va
-	//  and its size in memory can be found in ph->p_memsz.
-	//  The ph->p_filesz bytes from the ELF binary, starting at
-	//  'binary + ph->p_offset', should be copied to virtual address
-	//  ph->p_va.  Any remaining memory bytes should be cleared to zero.
-	//  (The ELF header should have ph->p_filesz <= ph->p_memsz.)
-	//  Use functions from the previous lab to allocate and map pages.
-	//
-	//  All page protection bits should be user read/write for now.
-	//  ELF segments are not necessarily page-aligned, but you can
-	//  assume for this function that no two segments will touch
-	//  the same virtual page.
-	//
-	//  You may find a function like segment_alloc useful.
-	//
-	//  Loading the segments is much simpler if you can move data
-	//  directly into the virtual addresses stored in the ELF binary.
-	//  So which page directory should be in force during
-	//  this function?
-	//
-	// Hint:
-	//  You must also do something with the program's entry point,
-	//  to make sure that the environment starts executing there.
-	//  What?  (See env_run() and env_pop_tf() below.)
+    // Hints: 
+    //  Load each program segment into virtual memory
+    //  at the address specified in the ELF section header.
+    //  You should only load segments with ph->p_type == ELF_PROG_LOAD.
+    //  Each segment's virtual address can be found in ph->p_va
+    //  and its size in memory can be found in ph->p_memsz.
+    //  The ph->p_filesz bytes from the ELF binary, starting at
+    //  'binary + ph->p_offset', should be copied to virtual address
+    //  ph->p_va.  Any remaining memory bytes should be cleared to zero.
+    //  (The ELF header should have ph->p_filesz <= ph->p_memsz.)
+    //  Use functions from the previous lab to allocate and map pages.
+    //
+    //  All page protection bits should be user read/write for now.
+    //  ELF segments are not necessarily page-aligned, but you can
+    //  assume for this function that no two segments will touch
+    //  the same virtual page.
+    //
+    //  You may find a function like segment_alloc useful.
+    //
+    //  Loading the segments is much simpler if you can move data
+    //  directly into the virtual addresses stored in the ELF binary.
+    //  So which page directory should be in force during
+    //  this function?
+    //
+    // Hint:
+    //  You must also do something with the program's entry point,
+    //  to make sure that the environment starts executing there.
+    //  What?  (See env_run() and env_pop_tf() below.)
 
-	// LAB 3: Your code here.
+    // LAB 3: Your code here.
 
-	// Add by hldyxh @ 2009-10-09
-        struct Elf *elf = (struct Elf *)binary;
-        uint8_t* va = NULL;
-        uint8_t* origin_va = NULL;
-        int page_num = 0;
-        int byte_num = 0;
-        int copyed_byte = 0;
-        int filesz = 0;
-        int memsz = 0;
-        int offset = 0;
+    // Add by hldyxh @ 2009-10-09
+    struct Elf *elf = (struct Elf *)binary;
+    uint8_t* va = NULL;
+    uint8_t* origin_va = NULL;
+    int page_num = 0;
+    int byte_num = 0;
+    int copyed_byte = 0;
+    int filesz = 0;
+    int memsz = 0;
+    int offset = 0;
 
-        struct Proghdr *ph, *eph;
-        int i,j;
-        struct Page *p;
-        pte_t* pte;
+    struct Proghdr *ph, *eph;
+    int i,j;
+    struct Page *p;
+    pte_t* pte;
 
-        if(elf->e_magic != ELF_MAGIC)
-                panic("elf->e_magic erro\n");
+    if(elf->e_magic != ELF_MAGIC)
+	panic("elf->e_magic erro\n");
 
-        // program header
-        ph = (struct Proghdr *)(binary + elf->e_phoff);
-        // one after last program header
-        eph = ph + elf->e_phnum;
+    // program header
+    ph = (struct Proghdr *)(binary + elf->e_phoff);
+    // one after last program header
+    eph = ph + elf->e_phnum;
 
-        // For each program header, load it into memory, zeroing as necessary
-        for(; ph < eph; ph++)
-        {
-                if(ph->p_type == ELF_PROG_LOAD)
-                {
-                         // map segment
-                        segment_alloc(e, (uintptr_t *)(ph->p_va), ph->p_memsz);
-                        pte =(pte_t*)KADDR(PTE_ADDR(e->env_pgdir[PDX(ph->p_va)]));
+    // For each program header, load it into memory, zeroing as necessary
+    for(; ph < eph; ph++)
+    {
+	if(ph->p_type == ELF_PROG_LOAD)
+	{
+	    // map segment
+	    segment_alloc(e, (uintptr_t *)(ph->p_va), ph->p_memsz);
+	    pte =(pte_t*)KADDR(PTE_ADDR(e->env_pgdir[PDX(ph->p_va)]));
 
-                        origin_va = (uint8_t*)ROUNDDOWN(ph->p_va, PGSIZE);
-                        offset = ph->p_va - (int)origin_va;
-                        page_num = ROUNDUP(ph->p_filesz + offset, PGSIZE) / PGSIZE;
-                        copyed_byte = 0;
-                        filesz = ph->p_filesz;
+	    origin_va = (uint8_t*)ROUNDDOWN(ph->p_va, PGSIZE);
+	    offset = ph->p_va - (int)origin_va;
+	    page_num = ROUNDUP(ph->p_filesz + offset, PGSIZE) / PGSIZE;
+	    copyed_byte = 0;
+	    filesz = ph->p_filesz;
 
-                        for (j = 0; j < page_num; j++)
-                        {
-                                va = (uint8_t *)(KADDR(PTE_ADDR(pte[PTX(origin_va)])) + offset);
-                                origin_va += PGSIZE;
+	    for (j = 0; j < page_num; j++)
+	    {
+		va = (uint8_t *)(KADDR(PTE_ADDR(pte[PTX(origin_va)])) + offset);
+		origin_va += PGSIZE;
 
-                                if ((filesz + offset) > PGSIZE)
-                                {
-                                        filesz -= PGSIZE - offset;
-                                        byte_num = PGSIZE - offset;
-                                }
-                                else
-                                {
-                                        byte_num = filesz;
-                                }
+		if ((filesz + offset) > PGSIZE)
+		{
+		    filesz -= PGSIZE - offset;
+		    byte_num = PGSIZE - offset;
+		}
+		else
+		{
+		    byte_num = filesz;
+		}
 
-                                offset = 0;
-                                memcpy(va, binary + ph->p_offset + copyed_byte, byte_num);
-                                copyed_byte += byte_num;
-                        }
-                        if (copyed_byte != ph->p_filesz)
-                                panic("Load_icode failed\n");
-                }
-        }
+		offset = 0;
+		memcpy(va, binary + ph->p_offset + copyed_byte, byte_num);
+		copyed_byte += byte_num;
+	    }
+	    if (copyed_byte != ph->p_filesz)
+		panic("Load_icode failed\n");
+	}
+    }
 
-        // Set up the environment's trapframe to point to the right location
-        // Other values for the trap frame as assigned in env_alloc
-        e->env_tf.tf_eip = elf->e_entry;
+    // Set up the environment's trapframe to point to the right location
+    // Other values for the trap frame as assigned in env_alloc
+    e->env_tf.tf_eip = elf->e_entry;
 
-        // Add end
+    // Add end
 
-	// Now map one page for the program's initial stack
-	// at virtual address USTACKTOP - PGSIZE.
+    // Now map one page for the program's initial stack
+    // at virtual address USTACKTOP - PGSIZE.
 
-	// LAB 3: Your code here.
-        //      Add by hldyxh @ 2009-10-09
-        segment_alloc(e,(uintptr_t*)(USTACKTOP - PGSIZE),PGSIZE);
-        // Add end
+    // LAB 3: Your code here.
+    //      Add by hldyxh @ 2009-10-09
+    segment_alloc(e,(uintptr_t*)(USTACKTOP - PGSIZE),PGSIZE);
+    // Add end
 }
+
 
 //
 // Allocates a new env and loads the named elf binary into it.
@@ -343,7 +377,15 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 void
 env_create(uint8_t *binary, size_t size)
 {
-	// LAB 3: Your code here.
+    // LAB 3: Your code here.
+    struct Env *e;
+    int r;
+
+    if ((r = env_alloc(&e, 0)) < 0)
+	panic("env_alloc: %e", r);
+    
+    e->env_status = ENV_RUNNABLE;
+    load_icode(e, binary, size);
 }
 
 //
@@ -352,45 +394,45 @@ env_create(uint8_t *binary, size_t size)
 void
 env_free(struct Env *e)
 {
-	pte_t *pt;
-	uint32_t pdeno, pteno;
-	physaddr_t pa;
+    pte_t *pt;
+    uint32_t pdeno, pteno;
+    physaddr_t pa;
 
-	// Note the environment's demise.
-	cprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+    // Note the environment's demise.
+    cprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 
-	// Flush all mapped pages in the user portion of the address space
-	static_assert(UTOP % PTSIZE == 0);
-	for (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {
+    // Flush all mapped pages in the user portion of the address space
+    static_assert(UTOP % PTSIZE == 0);
+    for (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {
 
-		// only look at mapped page tables
-		if (!(e->env_pgdir[pdeno] & PTE_P))
-			continue;
+	// only look at mapped page tables
+	if (!(e->env_pgdir[pdeno] & PTE_P))
+	    continue;
 
-		// find the pa and va of the page table
-		pa = PTE_ADDR(e->env_pgdir[pdeno]);
-		pt = (pte_t*) KADDR(pa);
+	// find the pa and va of the page table
+	pa = PTE_ADDR(e->env_pgdir[pdeno]);
+	pt = (pte_t*) KADDR(pa);
 
-		// unmap all PTEs in this page table
-		for (pteno = 0; pteno <= PTX(~0); pteno++) {
-			if (pt[pteno] & PTE_P)
-				page_remove(e->env_pgdir, PGADDR(pdeno, pteno, 0));
-		}
-
-		// free the page table itself
-		e->env_pgdir[pdeno] = 0;
-		page_decref(pa2page(pa));
+	// unmap all PTEs in this page table
+	for (pteno = 0; pteno <= PTX(~0); pteno++) {
+	    if (pt[pteno] & PTE_P)
+		page_remove(e->env_pgdir, PGADDR(pdeno, pteno, 0));
 	}
 
-	// free the page directory
-	pa = e->env_cr3;
-	e->env_pgdir = 0;
-	e->env_cr3 = 0;
+	// free the page table itself
+	e->env_pgdir[pdeno] = 0;
 	page_decref(pa2page(pa));
+    }
 
-	// return the environment to the free list
-	e->env_status = ENV_FREE;
-	LIST_INSERT_HEAD(&env_free_list, e, env_link);
+    // free the page directory
+    pa = e->env_cr3;
+    e->env_pgdir = 0;
+    e->env_cr3 = 0;
+    page_decref(pa2page(pa));
+
+    // return the environment to the free list
+    e->env_status = ENV_FREE;
+    LIST_INSERT_HEAD(&env_free_list, e, env_link);
 }
 
 //
@@ -401,11 +443,11 @@ env_free(struct Env *e)
 void
 env_destroy(struct Env *e) 
 {
-	env_free(e);
+    env_free(e);
 
-	cprintf("Destroyed the only environment - nothing more to do!\n");
-	while (1)
-		monitor(NULL);
+    cprintf("Destroyed the only environment - nothing more to do!\n");
+    while (1)
+	monitor(NULL);
 }
 
 
@@ -417,14 +459,14 @@ env_destroy(struct Env *e)
 void
 env_pop_tf(struct Trapframe *tf)
 {
-	__asm __volatile("movl %0,%%esp\n"
-		"\tpopal\n"
-		"\tpopl %%es\n"
-		"\tpopl %%ds\n"
-		"\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
-		"\tiret"
-		: : "g" (tf) : "memory");
-	panic("iret failed");  /* mostly to placate the compiler */
+    __asm __volatile("movl %0,%%esp\n"
+		     "\tpopal\n"
+		     "\tpopl %%es\n"
+		     "\tpopl %%ds\n"
+		     "\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
+		     "\tiret"
+		     : : "g" (tf) : "memory");
+    panic("iret failed");  /* mostly to placate the compiler */
 }
 
 //
@@ -435,21 +477,28 @@ env_pop_tf(struct Trapframe *tf)
 void
 env_run(struct Env *e)
 {
-	// Step 1: If this is a context switch (a new environment is running),
-	//	   then set 'curenv' to the new environment,
-	//	   update its 'env_runs' counter, and
-	//	   and use lcr3() to switch to its address space.
-	// Step 2: Use env_pop_tf() to restore the environment's
-	//         registers and drop into user mode in the
-	//         environment.
+    // Step 1: If this is a context switch (a new environment is running),
+    //	   then set 'curenv' to the new environment,
+    //	   update its 'env_runs' counter, and
+    //	   and use lcr3() to switch to its address space.
+    // Step 2: Use env_pop_tf() to restore the environment's
+    //         registers and drop into user mode in the
+    //         environment.
 
-	// Hint: This function loads the new environment's state from
-	//	e->env_tf.  Go back through the code you wrote above
-	//	and make sure you have set the relevant parts of
-	//	e->env_tf to sensible values.
+    // Hint: This function loads the new environment's state from
+    //	e->env_tf.  Go back through the code you wrote above
+    //	and make sure you have set the relevant parts of
+    //	e->env_tf to sensible values.
 	
-	// LAB 3: Your code here.
+    // LAB 3: Your code here.
 
-        panic("env_run not yet implemented");
+
+    if (e->env_status != ENV_RUNNABLE)
+    	panic("not runable\n");
+
+    curenv = e;
+    e->env_runs ++;
+    lcr3(e->env_cr3);
+    env_pop_tf(&(e->env_tf));
 }
 

@@ -25,9 +25,9 @@ i386_init(void)
 	// Initialize the console.
 	// Can't call cprintf until after we do this!
 	cons_init();
-
+#if defined(LAB1_ONLY)
 	cprintf("6828 decimal is %o octal!\n", 6828);
-
+#endif
 	// Lab 2 memory management initialization functions
 	i386_detect_memory();
 	i386_vm_init();
@@ -37,7 +37,6 @@ i386_init(void)
 	// Lab 3 user environment initialization functions
 	env_init();
 	idt_init();
-
 
 	// Temporary test code specific to LAB 3
 #if defined(TEST)
