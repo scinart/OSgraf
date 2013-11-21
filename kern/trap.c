@@ -154,7 +154,7 @@ trap_dispatch(struct Trapframe *tf)
 {
     // Handle processor exceptions.
     // LAB 3: Your code here.
-
+    //cprintf("trap_dispatch trap.c: %d\n",tf->tf_trapno);
     struct PushRegs *regs;        
     switch (tf->tf_trapno) {
     case T_SYSCALL:

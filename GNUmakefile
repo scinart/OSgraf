@@ -144,6 +144,11 @@ xrun-%:
 	$(V)$(MAKE) "DEFS=-DTEST=_binary_obj_user_$*_start -DTESTSIZE=_binary_obj_user_$*_size" $(IMAGES)
 	bochs -q
 
+grun-%:
+	$(V)rm -f $(OBJDIR)/kern/init.o $(IMAGES)
+	$(V)$(MAKE) "DEFS=-DTEST=_binary_obj_user_$*_start -DTESTSIZE=_binary_obj_user_$*_size" $(IMAGES)
+	bochsgdb 
+
 # This magic automatically generates makefile dependencies
 # for header files included from C source files we compile,
 # and keeps those dependencies up-to-date every time we recompile.

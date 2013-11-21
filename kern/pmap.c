@@ -285,6 +285,7 @@ i386_vm_init(void)
     //ori env_size = ROUNDUP((sizeof(struct Env) * NENV), PGSIZE);
     env_size = (sizeof(struct Env) * NENV);
     envs = boot_alloc(env_size, PGSIZE);
+    //memset(envs, 0, NENV * sizeof(struct Env));
 
     //newly added scinart//////////////////////////////////////////////////
     // Now that we've allocated the initial kernel data structures, we set
@@ -601,7 +602,7 @@ page_decref(struct Page* pp)
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-    // Fill this function in
+
     struct Page *page_tmp;
     pte_t *pt;//页表地址
     pgdir = (pde_t *)&pgdir[PDX(va)];
@@ -788,7 +789,6 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
   // }
   // return 0;
 
-    
     // @huangruizhe 20120412 
     pte_t * pte; 
     perm = perm | PTE_P; 
@@ -800,13 +800,14 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	    user_mem_check_addr = (uintptr_t)offset; 
 	    return -E_FAULT; 
 	} 
-	pte = pgdir_walk(env->env_pgdir, (void *)offset, 0);
-	pte_t* pgdir = env->env_pgdir;
-	pgdir = (pde_t *)&pgdir[PDX(va)];
-	//(!(*pgdir & PTE_P))
-	//cprintf("\npgdir: %x\n*pgdir: %x\nPTE_P: %x\n", pgdir, *pgdir, PTE_P);    
-	//cprintf("PDX(va): %x\n",pgdir[0]);
-	//cprintf("\npte: %x\nperm: %x\n*pte: %x\npgdir: %x\n",pte,perm,*pte, *pgdir);
+	pte = pgdir_walk(/*scinart-mark*/
+	    env->env_pgdir
+	    //boot_pgdir
+	    , va, 0);
+
+	//
+	cprintf("pgdir: %x\n*pgdir: %x\nva: %x\n",pte,pte[0],(uint32_t)va);
+
 	if(pte == NULL || !(*pte & perm)){ 
 	    user_mem_check_addr = (uintptr_t)offset; 
 	    return -E_FAULT; 

@@ -71,14 +71,29 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 void
 env_init(void)
 {
-    // LAB 3: Your code here.
+    // LAB 3: Your code here. 
+   // @huangruizhe 20120408 
+   // int i; 
+   // env_free_list = &envs[0]; 
+   // envs[0].env_status = ENV_FREE; 
+   // envs[0].env_id = 0; 
+   // for(i = 1; i < NENV; i ++){ 
+   //    envs[i].env_status = ENV_FREE; 
+   //    envs[i].env_id = 0; 
+   //    envs[i - 1].env_link = &envs[i]; 
+   // } 
+ 
+   // Per-CPU part of the initialization 
+   //  env_init_percpu(); 
+
+   // LAB 3: Your code here.
     LIST_INIT(&env_free_list);
     int i;
     for (i=NENV-1; i>=0; i--) {
-	envs[i].env_id = 0;
-	envs[i].env_runs = 0;
-	envs[i].env_status = ENV_FREE;
-	LIST_INSERT_HEAD(&env_free_list, &envs[i], env_link);
+    	envs[i].env_id = 0;
+    	envs[i].env_runs = 0;
+    	envs[i].env_status = ENV_FREE;
+    	LIST_INSERT_HEAD(&env_free_list, &envs[i], env_link);
     }
 }
 
@@ -119,19 +134,23 @@ env_setup_vm(struct Env *e)
 
     // LAB 3: Your code here.
     //version 1
-    // memset(page2kva(p), 0, PGSIZE);
-    // e->env_pgdir = page2kva(p);
-    // e->env_cr3 = page2pa(p);
-    // p->pp_ref ++;
-    // for (i=PDX(UTOP); i<NPDENTRIES; i++)
-    // 	e->env_pgdir[i] = boot_pgdir[i];
-    //version 2
-    p->pp_ref++;
+    memset(page2kva(p), 0, PGSIZE);
     e->env_pgdir = page2kva(p);
-    e->env_cr3 = PADDR(e->env_pgdir);
-    memset(e->env_pgdir, 0, PDX(UTOP) * 4);
-    memmove(e->env_pgdir + PDX(UTOP), boot_pgdir + PDX(UTOP),
-           PGSIZE - PDX(UTOP) * 4);
+    e->env_cr3 = page2pa(p);
+    p->pp_ref ++;
+    for (i=PDX(UTOP); i<NPDENTRIES; i++)
+    	e->env_pgdir[i] = boot_pgdir[i];
+    for (i=0/*,cprintf("env_init_vm\n")*/;i<PDX(UTOP); i++)
+    {
+        e->env_pgdir[i]=0;
+    }
+    //version 2
+    // p->pp_ref++;
+    // e->env_pgdir = page2kva(p);
+    // e->env_cr3 = PADDR(e->env_pgdir);
+    // memset(e->env_pgdir, 0, PDX(UTOP) * 4);
+    // memmove(e->env_pgdir + PDX(UTOP), boot_pgdir + PDX(UTOP),
+    //        PGSIZE - PDX(UTOP) * 4);
 
 
     // VPT and UVPT map the env's own page table, with
@@ -217,16 +236,32 @@ segment_alloc(struct Env *e, void *va, size_t len)
     // Hint: It is easier to use segment_alloc if the caller can pass
     //   'va' and 'len' values that are not page-aligned.
     //   You should round va down, and round len up.
-    void *aligned_va = ROUNDDOWN(va, PGSIZE);
-    size_t i, aligned_len = ROUNDUP(len, PGSIZE);
-    struct Page *page;
+    // void *aligned_va = ROUNDDOWN(va, PGSIZE);
+    // size_t i, aligned_len = ROUNDUP(len, PGSIZE);
+    // struct Page *page;
         
-    for (i=0; i<aligned_len; i+=PGSIZE) {
-	if (-E_NO_MEM == page_alloc(&page)) {
-	    panic("No memory\n");
-	}
-	page_insert(e->env_pgdir, page, aligned_va+i, PTE_U | PTE_W);
-    }
+    // for (i=0; i<aligned_len; i+=PGSIZE) {
+    // 	if (-E_NO_MEM == page_alloc(&page)) {
+    // 	    panic("No memory\n");
+    // 	}
+    // 	page_insert(e->env_pgdir, page, aligned_va+i, PTE_U | PTE_W);
+    // }
+
+       struct Page *p;
+        void *va_end;
+        int r;
+
+        va_end = va + len;
+        va = ROUNDDOWN(va, PGSIZE);
+        while (va < va_end) {
+                if ((r = page_alloc(&p)) < 0)
+                        panic("segment_alloc: %e", r);
+
+                if ((r = page_insert(e->env_pgdir, p, va, PTE_W |PTE_U)) < 0)
+                        panic("segment_alloc: %e", r);
+
+                va += PGSIZE;
+        }
 }
 
 //
@@ -284,83 +319,172 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
     //  What?  (See env_run() and env_pop_tf() below.)
 
     // LAB 3: Your code here.
+  // LAB 3: Your code here.
+        struct Proghdr *ph, *eph;
+        struct Elf *elfhdr = (struct Elf *)binary;
+        struct Page *page;
+        int copy_size, copy_count;
+        uintptr_t page_offset;
+        void *copy_to, *copy_from;
 
+        // is this a valid ELF?
+        if (elfhdr->e_magic != ELF_MAGIC)
+                panic("Bad ELF Format in kern/env.c/load_icode()!\n");
+
+        // load each program segment (ignores ph flags)
+        ph = (struct Proghdr *) ((uint8_t *) elfhdr + elfhdr->e_phoff);
+        eph = ph + elfhdr->e_phnum;
+        for (; ph < eph; ph ++) {
+                if (ph->p_type == ELF_PROG_LOAD) {
+                        // allocate memory in the Env's page table
+                        segment_alloc(e, (void *)ph->p_va, ph->p_memsz);
+
+                        // copy binary+ph->offset, length: ph->p_filesz to ph->p_va in the Env's page table
+                        void *copy_ptr = binary + ph->p_offset;
+
+                        for (copy_count = 0; copy_count < ph->p_filesz; ) {
+                                if (NULL == (page = page_lookup(e->env_pgdir, (void *)(ph->p_va + copy_count), NULL))) {
+                                        panic("Page cannot be find\n");
+                                }
+
+                                // calculate copy_size and copy_to according to start add.
+                                // the first time the p_va maybe not at the beginning of a page
+                                // if p_va+copy_count is at the beginning of a page, copy_size is PGSIZE
+                                page_offset = PGOFF(ph->p_va + copy_count);
+                                copy_size = PGSIZE - page_offset;
+
+                                // fix copy_size and copy_to according to end add.
+                                // if the end is within this page
+                                if (copy_count + copy_size > ph->p_filesz) {
+                                        copy_size = ph->p_filesz - copy_count;
+                                }
+
+                                copy_from = copy_ptr + copy_count;
+                                copy_to = page2kva(page) + page_offset;
+
+                                memmove(copy_to, copy_from, copy_size);
+
+                                copy_count += copy_size;
+                        }
+
+                        if (copy_count != ph->p_filesz)
+                                panic("Unequal of copy_count and ph->p_filesz\n");
+                        // set p_filesz to p_memsz zero
+                        for ( ; copy_count < ph->p_memsz; ) {
+                                if (NULL == (page = page_lookup(e->env_pgdir, (void *)(ph->p_va + copy_count), NULL))) {
+                                        panic("Page cannot be find\n");
+                                }
+
+                                // calculate copy_size and copy_to according to start add.
+                                // the first time the p_va maybe not at the beginning of a page
+                                // if p_va+copy_count is at the beginning of a page, copy_size is PGSIZE
+                                page_offset = PGOFF(ph->p_va + copy_count);
+                                copy_size = PGSIZE - page_offset;
+
+                                // fix copy_size and copy_to according to end add.
+                                // if the end is within this page
+                                if (copy_count + copy_size > ph->p_memsz) {
+                                        copy_size = ph->p_memsz - copy_count;
+                                }
+
+                                copy_to = page2kva(page) + page_offset;
+
+                                memset(copy_to, 0, copy_size);
+
+                                copy_count += copy_size;
+                        }
+
+                        if (copy_count != ph->p_memsz)
+                                panic("Unequal of copy_count and ph->p_filesz\n");
+                }
+        }
+
+        // Now map one page for the program's initial stack
+        // at virtual address USTACKTOP - PGSIZE.
+
+        // LAB 3: Your code here.
+        segment_alloc(e, (uintptr_t *)(USTACKTOP - PGSIZE), PGSIZE);
+
+        // Set the program's entry point e->env_tf.tf_eip
+        e->env_tf.tf_eip = elfhdr->e_entry;
+	
     // Add by hldyxh @ 2009-10-09
-    struct Elf *elf = (struct Elf *)binary;
-    uint8_t* va = NULL;
-    uint8_t* origin_va = NULL;
-    int page_num = 0;
-    int byte_num = 0;
-    int copyed_byte = 0;
-    int filesz = 0;
-    int memsz = 0;
-    int offset = 0;
+    // struct Elf *elf = (struct Elf *)binary;
+    // uint8_t* va = NULL;
+    // uint8_t* origin_va = NULL;
+    // int page_num = 0;
+    // int byte_num = 0;
+    // int copyed_byte = 0;
+    // int filesz = 0;
+    // int memsz = 0;
+    // int offset = 0;
 
-    struct Proghdr *ph, *eph;
-    int i,j;
-    struct Page *p;
-    pte_t* pte;
+    // struct Proghdr *ph, *eph;
+    // int i,j;
+    // struct Page *p;
+    // pte_t* pte;
 
-    if(elf->e_magic != ELF_MAGIC)
-	panic("elf->e_magic erro\n");
+    // if(elf->e_magic != ELF_MAGIC)
+    // 	panic("elf->e_magic erro\n");
 
-    // program header
-    ph = (struct Proghdr *)(binary + elf->e_phoff);
-    // one after last program header
-    eph = ph + elf->e_phnum;
+    // // program header
+    // ph = (struct Proghdr *)(binary + elf->e_phoff);
+    // // one after last program header
+    // eph = ph + elf->e_phnum;
+    // // For each program header, load it into memory, zeroing as necessary
+    // for(; ph < eph; ph++)
+    // {
+    // 	if(ph->p_type == ELF_PROG_LOAD)
+    // 	{
+    // 	    // map segment
 
-    // For each program header, load it into memory, zeroing as necessary
-    for(; ph < eph; ph++)
-    {
-	if(ph->p_type == ELF_PROG_LOAD)
-	{
-	    // map segment
-	    segment_alloc(e, (uintptr_t *)(ph->p_va), ph->p_memsz);
-	    pte =(pte_t*)KADDR(PTE_ADDR(e->env_pgdir[PDX(ph->p_va)]));
+    // 	    segment_alloc(e, (uintptr_t *)(ph->p_va), ph->p_memsz);
 
-	    origin_va = (uint8_t*)ROUNDDOWN(ph->p_va, PGSIZE);
-	    offset = ph->p_va - (int)origin_va;
-	    page_num = ROUNDUP(ph->p_filesz + offset, PGSIZE) / PGSIZE;
-	    copyed_byte = 0;
-	    filesz = ph->p_filesz;
+    // 	    pte =(pte_t*)KADDR(PTE_ADDR(e->env_pgdir[PDX(ph->p_va)]));
 
-	    for (j = 0; j < page_num; j++)
-	    {
-		va = (uint8_t *)(KADDR(PTE_ADDR(pte[PTX(origin_va)])) + offset);
-		origin_va += PGSIZE;
+    // 	    origin_va = (uint8_t*)ROUNDDOWN(ph->p_va, PGSIZE);
+    // 	    offset = ph->p_va - (int)origin_va;
+    // 	    page_num = ROUNDUP(ph->p_filesz + offset, PGSIZE) / PGSIZE;
+    // 	    copyed_byte = 0;
+    // 	    filesz = ph->p_filesz;
 
-		if ((filesz + offset) > PGSIZE)
-		{
-		    filesz -= PGSIZE - offset;
-		    byte_num = PGSIZE - offset;
-		}
-		else
-		{
-		    byte_num = filesz;
-		}
+    // 	    for (j = 0; j < page_num; j++)
+    // 	    {
+    // 		va = (uint8_t *)(KADDR(PTE_ADDR(pte[PTX(origin_va)])) + offset);
+    // 		origin_va += PGSIZE;
 
-		offset = 0;
-		memcpy(va, binary + ph->p_offset + copyed_byte, byte_num);
-		copyed_byte += byte_num;
-	    }
-	    if (copyed_byte != ph->p_filesz)
-		panic("Load_icode failed\n");
-	}
-    }
+    // 		if ((filesz + offset) > PGSIZE)
+    // 		{
+    // 		    filesz -= PGSIZE - offset;
+    // 		    byte_num = PGSIZE - offset;
+    // 		}
+    // 		else
+    // 		{
+    // 		    byte_num = filesz;
+    // 		}
 
-    // Set up the environment's trapframe to point to the right location
-    // Other values for the trap frame as assigned in env_alloc
-    e->env_tf.tf_eip = elf->e_entry;
+    // 		offset = 0;
+    // 		memcpy(va, binary + ph->p_offset + copyed_byte, byte_num);
+    // 		copyed_byte += byte_num;
+    // 	    }
+    // 	    if (copyed_byte != ph->p_filesz)
+    // 		panic("Load_icode failed\n");
+    // 	}
+    // }
 
-    // Add end
+    // // Set up the environment's trapframe to point to the right location
+    // // Other values for the trap frame as assigned in env_alloc
+    // e->env_tf.tf_eip = elf->e_entry;
 
-    // Now map one page for the program's initial stack
-    // at virtual address USTACKTOP - PGSIZE.
+    // // Add end
 
-    // LAB 3: Your code here.
-    //      Add by hldyxh @ 2009-10-09
-    segment_alloc(e,(uintptr_t*)(USTACKTOP - PGSIZE),PGSIZE);
-    // Add end
+    // // Now map one page for the program's initial stack
+    // // at virtual address USTACKTOP - PGSIZE.
+
+    // // LAB 3: Your code here.
+    // //      Add by hldyxh @ 2009-10-09
+    // segment_alloc(e,(uintptr_t*)(USTACKTOP - PGSIZE),PGSIZE);
+    // // Add end
 }
 
 
@@ -383,9 +507,10 @@ env_create(uint8_t *binary, size_t size)
 
     if ((r = env_alloc(&e, 0)) < 0)
 	panic("env_alloc: %e", r);
-    
+    cprintf("env.c 408: %x\n", e->env_pgdir[0]);
     e->env_status = ENV_RUNNABLE;
     load_icode(e, binary, size);
+    cprintf("env.c 408: %x\n", e->env_pgdir[0]);
 }
 
 //
@@ -495,7 +620,6 @@ env_run(struct Env *e)
 
     if (e->env_status != ENV_RUNNABLE)
     	panic("not runable\n");
-
     curenv = e;
     e->env_runs ++;
     lcr3(e->env_cr3);
