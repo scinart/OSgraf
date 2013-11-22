@@ -10,46 +10,60 @@
 #include <kern/kclock.h>
 #include <kern/env.h>
 #include <kern/trap.h>
-
+#include <kern/sched.h>
+#include <kern/picriq.h>
 
 void
 i386_init(void)
 {
-	extern char edata[], end[];
+    extern char edata[], end[];
 
-	// Before doing anything else, complete the ELF loading process.
-	// Clear the uninitialized global data (BSS) section of our program.
-	// This ensures that all static/global variables start out zero.
-	memset(edata, 0, end - edata);
+    // Before doing anything else, complete the ELF loading process.
+    // Clear the uninitialized global data (BSS) section of our program.
+    // This ensures that all static/global variables start out zero.
+    memset(edata, 0, end - edata);
 
-	// Initialize the console.
-	// Can't call cprintf until after we do this!
-	cons_init();
+    // Initialize the console.
+    // Can't call cprintf until after we do this!
+    cons_init();
 #if defined(LAB1_ONLY)
-	cprintf("6828 decimal is %o octal!\n", 6828);
+    cprintf("6828 decimal is %o octal!\n", 6828);
 #endif
-	// Lab 2 memory management initialization functions
-	i386_detect_memory();
-	i386_vm_init();
-	page_init();
-	page_check();
+    // Lab 2 memory management initialization functions
+    i386_detect_memory();
+    i386_vm_init();
+    page_init();
+    page_check();
 
-	// Lab 3 user environment initialization functions
-	env_init();
-	idt_init();
+    // Lab 3 user environment initialization functions
+    env_init();
+    idt_init();
 
-	// Temporary test code specific to LAB 3
+    // Lab 4 multitasking initialization functions
+    pic_init();
+    kclock_init();
+
+    // Should always have an idle process as first one.
+    ENV_CREATE(user_idle);
+  
+
+
+
+
+
+    // Temporary test code specific to LAB 3 ???????by scinart
 #if defined(TEST)
-	// Don't touch -- used by grading script!
-	ENV_CREATE2(TEST, TESTSIZE);
+    // Don't touch -- used by grading script!
+    ENV_CREATE2(TEST, TESTSIZE);
 #else
-	// Touch all you want.
-	ENV_CREATE(user_hello);
+    // Touch all you want.
+    ENV_CREATE(user_primes);
 #endif // TEST*
 
 
-	// We only have one user environment for now, so just run it.
-	env_run(&envs[0]);
+    // Schedule and run the first user environment!
+    sched_yield();
+
 
 
 }
@@ -68,33 +82,33 @@ static const char *panicstr;
 void
 _panic(const char *file, int line, const char *fmt,...)
 {
-	va_list ap;
+    va_list ap;
 
-	if (panicstr)
-		goto dead;
-	panicstr = fmt;
+    if (panicstr)
+	goto dead;
+    panicstr = fmt;
 
-	va_start(ap, fmt);
-	cprintf("kernel panic at %s:%d: ", file, line);
-	vcprintf(fmt, ap);
-	cprintf("\n");
-	va_end(ap);
+    va_start(ap, fmt);
+    cprintf("kernel panic at %s:%d: ", file, line);
+    vcprintf(fmt, ap);
+    cprintf("\n");
+    va_end(ap);
 
 dead:
-	/* break into the kernel monitor */
-	while (1)
-		monitor(NULL);
+    /* break into the kernel monitor */
+    while (1)
+	monitor(NULL);
 }
 
 /* like panic, but don't */
 void
 _warn(const char *file, int line, const char *fmt,...)
 {
-	va_list ap;
+    va_list ap;
 
-	va_start(ap, fmt);
-	cprintf("kernel warning at %s:%d: ", file, line);
-	vcprintf(fmt, ap);
-	cprintf("\n");
-	va_end(ap);
+    va_start(ap, fmt);
+    cprintf("kernel warning at %s:%d: ", file, line);
+    vcprintf(fmt, ap);
+    cprintf("\n");
+    va_end(ap);
 }

@@ -8,6 +8,10 @@
 #include <kern/monitor.h>
 #include <kern/env.h>
 #include <kern/syscall.h>
+#include <kern/sched.h> 
+#include <kern/kclock.h>
+#include <kern/picirq.h>
+
 
 static struct Taskstate ts;
 
@@ -49,6 +53,8 @@ static const char *trapname(int trapno)
 	return excnames[trapno];
     if (trapno == T_SYSCALL)
 	return "System call";
+    if (trapno >= IRQ_OFFSET && trapno < IRQ_OFFSET + 16)
+	return "Hardware Interrupt";
     return "(unknown trap)";
 }
 
@@ -202,9 +208,13 @@ trap(struct Trapframe *tf)
     // Dispatch based on what type of trap occurred
     trap_dispatch(tf);
 
-    // Return to the current environment, which should be runnable.
-    assert(curenv && curenv->env_status == ENV_RUNNABLE);
-    env_run(curenv);
+    // If we made it to this point, then no other environ
+    // scheduled, so we should return to the current envi
+    // if doing so makes sense.
+    if (curenv && curenv->env_status == ENV_RUNNABLE)
+	env_run(curenv);
+    else
+	sched_yield();
 }
 
 
