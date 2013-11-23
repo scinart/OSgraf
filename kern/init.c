@@ -11,7 +11,7 @@
 #include <kern/env.h>
 #include <kern/trap.h>
 #include <kern/sched.h>
-#include <kern/picriq.h>
+#include <kern/picirq.h>
 
 void
 i386_init(void)
