@@ -42,9 +42,9 @@ runbochs () {
 	) | (
 		ulimit -t $timeout
 		# date
-		 bochs -q #'display_library: nogui' \
-		 	'parport1: enabled=1, file="bochs.out"' 
-		# bochs -q > bochs.out
+		# bochs -q #'display_library: nogui' \
+		# 	'parport1: enabled=1, file="bochs.out"' 
+		bochs -q > bochs.out
 		# date
 	) >$out 2>$err
 	t1=`date +%s.%N 2>/dev/null`

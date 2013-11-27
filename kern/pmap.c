@@ -781,7 +781,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	    , va, 0);
 
 	//
-	cprintf("pgdir: %x\n*pgdir: %x\nva: %x\n",ppte,ppte[0],(uint32_t)va);
+	//cprintf("pgdir: %x\n*pgdir: %x\nva: %x\n",ppte,ppte[0],(uint32_t)va);
 
 	if(ppte == NULL || !(*ppte & perm)){ 
 	    user_mem_check_addr = (uintptr_t)offset; 
