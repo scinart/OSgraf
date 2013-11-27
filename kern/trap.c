@@ -66,7 +66,7 @@ idt_init(void)
 {
     extern struct Segdesc gdt[];
 	
-    // LAB 3: Your code here.
+    // LAB 3: Your code here. --done
     extern void divzero_entry();
     extern void debug_entry();
     extern void nmi_entry();
@@ -159,7 +159,7 @@ static void
 trap_dispatch(struct Trapframe *tf)
 {
     // Handle processor exceptions.
-    // LAB 3: Your code here.
+    // LAB 3: Your code here. --done
     //cprintf("trap_dispatch trap.c: %d\n",tf->tf_trapno);
     struct PushRegs *regs;        
     switch (tf->tf_trapno) {
@@ -230,7 +230,7 @@ page_fault_handler(struct Trapframe *tf)
 	panic("kern/trap.c/page_fault_handler: kernel page fault!\n"); 
     } 
 
-    // LAB 3: Your code here.
+    // LAB 3: Your code here. --done
 
     // We've already handled kernel-mode exceptions, so if we get here,
     // the page fault happened in user mode.

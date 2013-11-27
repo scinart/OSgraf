@@ -110,20 +110,20 @@ boot_alloc(uint32_t n, uint32_t align)
     if (boot_freemem == 0)
 	boot_freemem = end;
 
-    // LAB 2: Your code here:
+    // LAB 2: Your code here: --done
     //	Step 1: round boot_freemem up to be aligned properly
     //	Step 2: save current value of boot_freemem as allocated chunk
     //	Step 3: increase boot_freemem to record allocation
     //	Step 4: return allocated chunk
 
     //step1
-    boot_freemem = ROUNDUP(boot_freemem, align);//首先是把地址向上移到align对齐的地方开始
+    boot_freemem = ROUNDUP(boot_freemem, align);
     //step2
-    v = boot_freemem;//记录下起始地址，用于返回
+    v = boot_freemem;
     //step3
-    boot_freemem += n;//把boot_fremem上移到结束的地址
+    boot_freemem += n;
     //step4
-    return v;//把起始地址返回
+    return v;
 }
 
 //
@@ -280,14 +280,11 @@ i386_vm_init(void)
     // Permissions:
     //    - envs itself -- kernel RW, user NONE
     //    - the image of envs mapped at UENVS  -- kernel R, user R
-    // LAB 3: Your code here.
+    // LAB 3: Your code here. --done
     size_t env_size;
-    //ori env_size = ROUNDUP((sizeof(struct Env) * NENV), PGSIZE);
     env_size = (sizeof(struct Env) * NENV);
     envs = boot_alloc(env_size, PGSIZE);
-    //memset(envs, 0, NENV * sizeof(struct Env));
 
-    //newly added scinart//////////////////////////////////////////////////
     // Now that we've allocated the initial kernel data structures, we set
     // up the list of free physical pages. Once we've done so, all further
     // memory management will go through the page_* functions. In
@@ -767,117 +764,31 @@ static uintptr_t user_mem_check_addr;
 int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
-    // LAB 3: Your code here. 
-  // perm |= PTE_P;
-  // user_mem_check_addr = (uintptr_t) va;
-  // uintptr_t end = ROUNDUP(user_mem_check_addr+len, PGSIZE);
-  // pde_t *pgdir = env->env_pgdir;
-  // pte_t *pte;
-
-  // for (; user_mem_check_addr < end; user_mem_check_addr += PGSIZE) {
-  //   if (user_mem_check_addr >= ULIM)
-  //     return -E_FAULT;
-
-  //   /* Check page directory */
-  //   if ((pgdir[PDX(user_mem_check_addr)] & perm) != perm)
-  //     return -E_FAULT;
-
-  //   /* Check page table */
-  //   pte = pgdir_walk(pgdir, (void *)user_mem_check_addr, 0);
-  //   if ((*pte & perm) != perm)
-  //     return -E_FAULT;
-  // }
-  // return 0;
-
-    // @huangruizhe 20120412 
-    pte_t * pte; 
+    // LAB 3: Your code here. --done
+    pte_t * ppte; 
     perm = perm | PTE_P; 
     uint32_t offset = (uint32_t)va; 
     uint32_t offset_limit = ROUNDUP((uint32_t)va + len, PGSIZE);
-//    cprintf("\noffset: %u\noffsetlimit: %u\nPGSIZE: %u\nULIM: %u",offset,offset_limit,PGSIZE,ULIM);
+    //cprintf("\noffset: %u\noffsetlimit: %u\nPGSIZE: %u\nULIM: %u",offset,offset_limit,PGSIZE,ULIM);
     for(; offset < offset_limit; offset += PGSIZE){ 
 	if(offset >= ULIM){ 
 	    user_mem_check_addr = (uintptr_t)offset; 
 	    return -E_FAULT; 
 	} 
-	pte = pgdir_walk(/*scinart-mark*/
+	ppte = pgdir_walk(/*scinart-mark*/
 	    env->env_pgdir
 	    //boot_pgdir
 	    , va, 0);
 
 	//
-	cprintf("pgdir: %x\n*pgdir: %x\nva: %x\n",pte,pte[0],(uint32_t)va);
+	cprintf("pgdir: %x\n*pgdir: %x\nva: %x\n",ppte,ppte[0],(uint32_t)va);
 
-	if(pte == NULL || !(*pte & perm)){ 
+	if(ppte == NULL || !(*ppte & perm)){ 
 	    user_mem_check_addr = (uintptr_t)offset; 
 	    return -E_FAULT; 
 	} 
     } 
     return 0;
-   
-    // void * val = ROUNDDOWN((void *)va, PGSIZE);
-    // size_t lenl = ROUNDUP( va + len, PGSIZE) - val;
-    // //below ULIM
-    // size_t i = (size_t)val;
-    // //if( i > ULIM)
-    // // cprintf("%x\n%x\n", i , ULIM);
-    // for(; i < (size_t)val + lenl; i += PGSIZE)
-    // {
-    //     if( i > ULIM )
-    //     {
-    //         //cprintf("hello\n");
-    //         user_mem_check_addr = i;
-    //         if(i < (size_t)va)
-    //             user_mem_check_addr = (size_t)va;
-    //         return -E_FAULT;
-    //     }
-    //     pte_t * pte;
-    //     if(page_lookup(env->env_pgdir, (void *)i, &pte) == NULL)
-    //     {
-    //         user_mem_check_addr = i;
-    //         if(i < (size_t)va)
-    //             user_mem_check_addr = (size_t)va;
-    //         return -E_FAULT;
-    //     }
-    //     if((*pte & (perm | PTE_P)) >= (perm | PTE_P))
-    //         continue;
-    //     else
-    //     {
-    //         user_mem_check_addr = i;
-    //         if(i < (size_t)va)
-    //             user_mem_check_addr = (size_t)va;
-    //         return -E_FAULT;
-    //     }
-        
-    // }
-    
-    // return 0;
-
-
-
-    
-    // uintptr_t check_va = (uintptr_t)va;
-    // uintptr_t end_va = (uintptr_t)ROUNDUP(va+len, PGSIZE);
-    // pte_t *pte;
-
-    // if (check_va > ULIM) {
-    //     user_mem_check_addr = check_va;
-    //     return -E_FAULT;
-    // }
-
-    // for ( ; check_va < end_va; check_va += PGSIZE) {
-    //     pte = pgdir_walk(env->env_pgdir, (void *)check_va, 0);
-    //     if (pte == NULL) {
-    // 	   user_mem_check_addr = check_va;
-    // 	   return -E_FAULT;
-    //     }
-    //     if ((*pte & (perm | PTE_U)) != (perm | PTE_U)) {
-    // 	   user_mem_check_addr = check_va;
-    // 	   return -E_FAULT;
-    //     }
-    // }
-
-    // return 0;
 }
 
 //

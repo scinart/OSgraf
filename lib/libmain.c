@@ -12,7 +12,7 @@ void
 libmain(int argc, char **argv)
 {
     // set env to point at our env structure in envs[].
-    // LAB 3: Your code here.
+    // LAB 3: Your code here. --done
     env = &envs[ENVX(sys_getenvid())];
     //env = 0;
 
