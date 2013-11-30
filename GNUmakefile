@@ -123,7 +123,8 @@ distclean: realclean
 
 grade:  #$(LABSETUP)grade.sh
 	#$(V)$(MAKE) clean >/dev/null 2>/dev/null
-	#$(MAKE) all -- avoid making every time.
+    #avoid rebuilding every time.
+	$(MAKE) all
 	sh $(LABSETUP)grade.sh
 
 handin: tarball
