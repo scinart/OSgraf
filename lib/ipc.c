@@ -14,31 +14,28 @@
 //   Use 'env' to discover the value and who sent it.
 //   If 'pg' is null, pass sys_ipc_recv a value that it will understand
 //   as meaning "no page".  (Zero is not the right value.)
-uint32_t
+int32_t
 ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 {
 	// LAB 4: Your code here.
-	int err;
-	void *addr;
-	env = &envs[ENVX(sys_getenvid())];
+	int r;
 
-	if (pg == NULL) addr = (void *)UTOP;
-	else	addr = pg;
+	if (!pg)
+		pg = (void *)USTACKTOP;
 
-	if ((err = sys_ipc_recv(addr)) < 0) {
-		if (from_env_store != NULL) *from_env_store = 0;
-		if (perm_store != NULL)	*perm_store = 0;
-		return err;
+	if ((r = sys_ipc_recv(pg)) < 0) {
+		if (from_env_store)
+			*from_env_store = 0;
+		if (perm_store)
+			*perm_store = 0;
+		return r;
+	} else {
+		if (from_env_store)
+			*from_env_store = env->env_ipc_from;
+		if (perm_store)
+			*perm_store = env->env_ipc_perm;
+		return env->env_ipc_value;
 	}
-
-	if (from_env_store != NULL)
-		*from_env_store = env->env_ipc_from;
-	if (perm_store != NULL)
-		*perm_store = env->env_ipc_perm;
-	return env->env_ipc_value;
-
-	/* panic("ipc_recv not implemented"); */
-	/* return 0; */
 }
 
 // Send 'val' (and 'pg' with 'perm', assuming 'pg' is nonnull) to 'toenv'.
@@ -53,22 +50,16 @@ void
 ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 {
 	// LAB 4: Your code here.
-	int err;
-	void *addr;
-	
-	if (pg == NULL) addr = (void *)UTOP;
-	else	addr = pg;
+	int r;
 
 	while (1) {
-		err = sys_ipc_try_send(to_env, val, addr, perm);
-		if (err == -E_IPC_NOT_RECV)
-			sys_yield();
-		else if (err < 0)
-			panic("Sys_ipc_try_send returned with error: %d", err);
-		else
+		r = sys_ipc_try_send(to_env, val, pg, perm);
+		if (r >= 0)
 			return;
-	}
+		if (r != -E_IPC_NOT_RECV)
+			panic("sys_ipc_try_send error: %e", r);
 
-	/* panic("ipc_send not implemented"); */
+		sys_yield();
+	}
 }
 
