@@ -737,7 +737,11 @@ tlb_invalidate(pde_t *pgdir, void *va)
 {
     // Flush the entry only if we're modifying the current address space.
     // For now, there is only one address space, so always invalidate.
-    invlpg(va);
+    // invlpg(va);
+
+	// Flush the entry only if we're modifying the current address space.
+	if (!curenv || curenv->env_pgdir == pgdir)
+		invlpg(va);
 }
 static uintptr_t user_mem_check_addr;
 

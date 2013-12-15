@@ -46,7 +46,9 @@ i386_init(void)
     // Should always have an idle process as first one.
     ENV_CREATE(user_idle);
   
-
+//Lab 5
+// Start fs.
+//	ENV_CREATE(fs_fs);
 
 
 
@@ -59,6 +61,12 @@ i386_init(void)
     // Touch all you want.
     ENV_CREATE(user_primes);
 #endif // TEST*
+
+
+	// Touch all you want.
+	// ENV_CREATE(user_writemotd);
+	// ENV_CREATE(user_testfsipc);
+	// ENV_CREATE(user_icode);
 
 
     // Schedule and run the first user environment!
