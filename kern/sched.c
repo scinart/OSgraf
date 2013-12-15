@@ -17,26 +17,21 @@ sched_yield(void)
 	// is runnable.
 	// But never choose envs[0], the idle environment,
 	// unless NOTHING else is runnable.
-
 	// LAB 4: Your code here.
-	int i, curi;
+	int i;
 
-	// First time of calling sched_yield
+	// if there are no previous running environment,
+	// set this to the envs, i.e. envs[0]
 	if (curenv == NULL)
 		curenv = envs;
 
-	curi = curenv - envs;
-
-	for (i = (curi + 1) % NENV; i != curi; i = (i+1) % NENV) {
-		if (i == 0)
-			i++;
+	for (i = curenv - envs + 1; i < NENV; i++)
 		if (envs[i].env_status == ENV_RUNNABLE)
 			env_run(&envs[i]);
-	}
 
-	// If no other env is runnable, choose previously running env to run
-	if (envs[curi].env_status == ENV_RUNNABLE)
-		env_run(&envs[curi]);
+	for (i = 1; i <= curenv - envs; i++)
+		if (envs[i].env_status == ENV_RUNNABLE)
+			env_run(&envs[i]);
 
 	// Run the special idle environment when nothing else is runnable.
 	if (envs[0].env_status == ENV_RUNNABLE)
