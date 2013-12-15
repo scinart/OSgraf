@@ -66,7 +66,7 @@ sys_exofork(void)
 
 // ipc.c
 void	ipc_send(envid_t to_env, uint32_t value, void *pg, int perm);
-uint32_t ipc_recv(envid_t *from_env_store, void *pg, int *perm_store);
+int32_t ipc_recv(envid_t *from_env_store, void *pg, int *perm_store);
 
 // fork.c
 #define	PTE_SHARE	0x400
@@ -87,3 +87,11 @@ envid_t	sfork(void);	// Challenge!
 #define O_MKDIR		0x0800		/* create directory, not regular file */
 
 #endif	// !JOS_INC_LIB_H
+
+
+
+
+
+/* Local Variables: */
+/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 1921) (recenter-top-bottom)) */
+/* End: */

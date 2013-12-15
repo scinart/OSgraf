@@ -91,6 +91,16 @@
         movl $GD_KD, %eax
         movw %ax,%ds
         movw %ax,%es
+ 	# disable FL_IF in %eflags, i.e. disable interrupts
+        pushfl
+        popl %eax
+        movl $FL_IF, %ebx
+        notl %ebx
+        andl %ebx, %eax
+        pushl %eax
+        popfl
+        # end of disabling FL_IF
+
         # Call trap(tf), where tf=%esp
         pushl %esp
         call trap
