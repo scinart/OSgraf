@@ -51,7 +51,7 @@ GCCPREFIX := $(shell if i386-jos-elf-objdump -i 2>&1 | grep '^elf32-i386$$' >/de
 	echo "*** If your i386-*-elf toolchain is installed with a command" 1>&2; \
 	echo "*** prefix other than 'i386-jos-elf-', set your GCCPREFIX" 1>&2; \
 	echo "*** environment variable to that prefix and run 'make' again." 1>&2; \
-	echo "*** To turn off this error, run 'gmake GCCPREFIX= ...'." 1>&2; \
+	echo "*** To turn off this error, run 'make GCCPREFIX= ...'." 1>&2; \
 	echo "***" 1>&2; exit 1; fi)
 endif
 
@@ -144,7 +144,7 @@ run-%:
 xrun-%:
 	$(V)rm -f $(OBJDIR)/kern/init.o $(IMAGES)
 	$(V)$(MAKE) "DEFS=-DTEST=_binary_obj_user_$*_start -DTESTSIZE=_binary_obj_user_$*_size" $(IMAGES)
-	bochs -q
+	bochsgui -q
 
 grun-%:
 	$(V)rm -f $(OBJDIR)/kern/init.o $(IMAGES)
