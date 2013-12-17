@@ -201,8 +201,16 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 
     // If this is the file server (e == &envs[1]) give it I/O privileges.
-	// LAB 5: Your code here.
-
+    // LAB 5: Your code here. --added. 
+    if (e == &envs[1]) 
+    {
+	e->env_tf.tf_eflags |= FL_IOPL_MASK;
+    }
+    
+    /* e->env_pgfault_handler = 0; */
+    /* e->env_xstacktop = 0; */
+    /* e->env_runs = 0; */
+    /* e->env_name[0] = '\0'; */
     // commit the allocation
     LIST_REMOVE(e, env_link);
     *newenv_store = e;
@@ -538,3 +546,11 @@ env_run(struct Env *e)
     env_pop_tf(&(e->env_tf));
 }
 
+
+
+
+
+
+/* Local Variables: */
+/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 6164) (recenter-top-bottom)) */
+/* End: */

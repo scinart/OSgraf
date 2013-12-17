@@ -216,6 +216,9 @@ trap_dispatch(struct Trapframe *tf)
 	// clock interrupt
 	sched_yield();
 	break;
+    case IRQ_OFFSET + 1:
+	kbd_intr();
+	return;
     }
 
     // Unexpected trap: The user process or the kernel has a bug.
@@ -358,3 +361,11 @@ page_fault_handler(struct Trapframe *tf)
     env_run(curenv);
 }
 
+
+
+
+
+
+/* Local Variables: */
+/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 6480) (recenter-top-bottom)) */
+/* End: */

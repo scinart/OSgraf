@@ -48,7 +48,7 @@ i386_init(void)
   
 //Lab 5
 // Start fs.
-//	ENV_CREATE(fs_fs);
+    ENV_CREATE(fs_fs);
 
 
 
@@ -120,3 +120,11 @@ _warn(const char *file, int line, const char *fmt,...)
     cprintf("\n");
     va_end(ap);
 }
+
+
+
+
+
+/* Local Variables: */
+/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 1221) (recenter-top-bottom)) */
+/* End: */

@@ -19,7 +19,7 @@ umain(void)
 	int r;
 	int fileid;
 	struct Fd *fd;
-
+	cprintf("running testfsipc\n");
 	if ((r = fsipc_open("/not-found", O_RDONLY, FVA)) < 0 && r != -E_NOT_FOUND)
 		panic("serve_open /not-found: %e", r);
 	else if (r == 0)
@@ -49,3 +49,11 @@ umain(void)
 	cprintf("stale fileid is good\n");
 }
 
+
+
+
+
+
+/* Local Variables: */
+/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 309) (recenter-top-bottom)) */
+/* End: */
