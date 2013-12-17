@@ -7,7 +7,9 @@
 
 // Helper functions for spawn.
 static int init_stack(envid_t child, const char **argv, uintptr_t *init_esp);
-
+static int
+map_segment(envid_t child, uintptr_t va, size_t memsz,
+	    int fd, size_t filesz, off_t fileoffset, int perm);
 // Spawn a child process from a program image loaded from the file system.
 // prog: the pathname of the program to run.
 // argv: pointer to null-terminated array of pointers to strings,
@@ -19,6 +21,12 @@ spawn(const char *prog, const char **argv)
 	unsigned char elf_buf[512];
 	struct Trapframe child_tf;
 	envid_t child;
+
+	int fd, i, r;
+        struct Elf *elf;
+        struct Proghdr *ph;
+        int perm;
+
 
 	// Insert your code, following approximately this procedure:
 	//
@@ -83,8 +91,60 @@ spawn(const char *prog, const char **argv)
 
 	// LAB 5: Your code here.
 	
-	(void) child;
-	panic("spawn unimplemented!");
+        if ((r = open(prog, O_RDONLY)) < 0)
+                return r;
+        fd = r;
+
+        // Read elf header
+        elf = (struct Elf*) elf_buf;
+        if (read(fd, elf_buf, sizeof(elf_buf)) != sizeof(elf_buf)
+         || elf->e_magic != ELF_MAGIC) {
+                close(fd);
+                cprintf("elf magic %08x want %08x\n", elf->e_magic, ELF_MAGIC);
+                return -E_NOT_EXEC;
+        }
+
+        // Create new child environment
+        if ((r = sys_exofork()) < 0)
+                return r;
+        child = r;
+
+        // Set up trap frame, including initial stack.
+        child_tf = envs[ENVX(child)].env_tf;
+        child_tf.tf_eip = elf->e_entry;
+
+        if ((r = init_stack(child, argv, &child_tf.tf_esp)) < 0)
+                return r;
+
+        // Set up program segments as defined in ELF header.
+        ph = (struct Proghdr*) (elf_buf + elf->e_phoff);
+        for (i = 0; i < elf->e_phnum; i++, ph++) {
+                if (ph->p_type != ELF_PROG_LOAD)
+                        continue;
+                perm = PTE_P | PTE_U;
+                if (ph->p_flags & ELF_PROG_FLAG_WRITE)
+                        perm |= PTE_W;
+                if ((r = map_segment(child, ph->p_va, ph->p_memsz,
+                                 fd, ph->p_filesz, ph->p_offset, perm)) < 0)
+                        goto error;
+        }
+        close(fd);
+        fd = -1;
+
+        if ((r = sys_env_set_trapframe(child, &child_tf)) < 0)
+                panic("sys_env_set_trapframe: %e", r);
+
+        if ((r = sys_env_set_status(child, ENV_RUNNABLE)) < 0)
+                panic("sys_env_set_status: %e", r);
+
+        return child;
+
+error:
+        sys_env_destroy(child);
+        close(fd);
+        return r;
+	/* (void) child; */
+	/* panic("spawn unimplemented!"); */
 }
 
 // Spawn, taking command-line arguments array directly on the stack.
@@ -161,7 +221,20 @@ init_stack(envid_t child, const char **argv, uintptr_t *init_esp)
 	//	  (Again, use an address valid in the child's environment.)
 	//
 	// LAB 5: Your code here.
-	*init_esp = USTACKTOP;	// Change this!
+	for (i = 0; i < argc; i++) {
+                argv_store[i] = UTEMP2USTACK(string_store);
+                strcpy(string_store, argv[i]);
+                string_store += strlen(argv[i]) + 1;
+        }
+        argv_store[argc] = 0;
+        assert(string_store == (char*)UTEMP + PGSIZE);
+
+        argv_store[-1] = UTEMP2USTACK(argv_store);
+        argv_store[-2] = argc;
+
+        *init_esp = UTEMP2USTACK(&argv_store[-2]);
+
+	//*init_esp = USTACKTOP;	// Change this!
 
 	// After completing the stack, map it into the child's address space
 	// and unmap it from ours!
@@ -178,4 +251,59 @@ error:
 }
 
 
+static int
+map_segment(envid_t child, uintptr_t va, size_t memsz,
+        int fd, size_t filesz, off_t fileoffset, int perm)
+{
+        int i, r;
+        void *blk;
 
+        //cprintf("map_segment %x+%x\n", va, memsz);
+
+        if ((i = PGOFF(va))) {
+                va -= i;
+                memsz += i;
+                filesz += i;
+                fileoffset -= i;
+        }
+
+        for (i = 0; i < memsz; i += PGSIZE) {
+                if (i >= filesz) {
+                        // allocate a blank page
+                        if ((r = sys_page_alloc(child, (void*) (va + i), perm)) < 0)
+                                return r;
+                } else {
+                        // from file
+                        if (perm & PTE_W) {
+                                // must make a copy so it can be writable
+                                if ((r = sys_page_alloc(0, UTEMP, PTE_P|PTE_U|PTE_W)) < 0)
+                                        return r;
+                                if ((r = seek(fd, fileoffset + i)) < 0)
+                                        return r;
+                                if ((r = read(fd, UTEMP, MIN(PGSIZE, filesz-i))) < 0)
+                                        return r;
+                                if ((r = sys_page_map(0, UTEMP, child, (void*) (va + i), perm)) < 0)
+                                        panic("spawn: sys_page_map data: %e", r);
+                                sys_page_unmap(0, UTEMP);
+                        } else {
+                                // can map buffer cache read only
+                                if ((r = read_map(fd, fileoffset + i, &blk)) < 0)
+                                        return r;
+                                if ((r = sys_page_map(0, blk, child, (void*) (va + i), perm)) < 0)
+                                        panic("spawn: sys_page_map text: %e", r);
+                        }
+                }
+        }
+        return 0;
+}
+
+
+
+
+
+
+
+
+/* Local Variables: */
+/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 11201) (recenter-top-bottom)) */
+/* End: */
