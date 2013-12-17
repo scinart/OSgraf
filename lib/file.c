@@ -30,18 +30,37 @@ static int funmap(struct Fd *fd, off_t oldsize, off_t newsize, bool dirty);
 int
 open(const char *path, int mode)
 {
-	// Find an unused file descriptor page using fd_alloc.
-	// Then send a message to the file server to open a file
-	// using a function in fsipc.c.
-	// (fd_alloc does not allocate a page, it just returns an
-	// unused fd address.  Do you need to allocate a page?  Look
-	// at fsipc.c if you aren't sure.)
-	// Then map the file data (you may find fmap() helpful).
-	// Return the file descriptor index.
-	// If any step fails, use fd_close to free the file descriptor.
+    // Find an unused file descriptor page using fd_alloc.
+    // Then send a message to the file server to open a file
+    // using a function in fsipc.c.
+    // (fd_alloc does not allocate a page, it just returns an
+    // unused fd address.  Do you need to allocate a page?  Look
+    // at fsipc.c if you aren't sure.)
+    // Then map the file data (you may find fmap() helpful).
+    // Return the file descriptor index.
+    // If any step fails, use fd_close to free the file descriptor.
 
-	// LAB 5: Your code here.
-	panic("open() unimplemented!");
+    // LAB 5: Your code here.
+    int r;
+    struct Fd* fd;
+    r = fd_alloc(&fd);
+    if (r < 0)
+	return r;
+
+    r = fsipc_open(path, mode, fd);
+    if (r < 0)
+	goto out_err;
+
+    r = fmap(fd, 0, fd->fd_file.file.f_size);
+    if (r < 0)
+	goto out_err;
+
+    return fd2num(fd);
+
+out_err:
+    fd_close(fd, 0);
+    return r;
+    //panic("open() unimplemented!");
 }
 
 // Clean up a file-server file descriptor.
@@ -49,12 +68,19 @@ open(const char *path, int mode)
 static int
 file_close(struct Fd *fd)
 {
-	// Unmap any data mapped for the file,
-	// then tell the file server that we have closed the file
-	// (to free up its resources).
+    // Unmap any data mapped for the file,
+    // then tell the file server that we have closed the file
+    // (to free up its resources).
 
-	// LAB 5: Your code here.
-	panic("close() unimplemented!");
+    // LAB 5: Your code here.
+    int r;
+    r = funmap(fd, fd->fd_file.file.f_size, 0, 1);
+    if (r < 0)
+	return r;
+
+    return fsipc_close(fd->fd_file.id);
+
+    //panic("close() unimplemented!");
 }
 
 // Read 'n' bytes from 'fd' at the current seek position into 'buf'.
@@ -220,3 +246,11 @@ sync(void)
 	return fsipc_sync();
 }
 
+
+
+
+
+
+/* Local Variables: */
+/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 1439) (recenter-top-bottom)) */
+/* End: */

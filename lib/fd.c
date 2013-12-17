@@ -32,6 +32,12 @@ fd2num(struct Fd *fd)
 	return ((uintptr_t) fd - FDTABLE) / PGSIZE;
 }
 
+static int
+va_is_mapped(void *va)
+{
+	return (vpd[PDX(va)] & PTE_P) && (vpt[VPN(va)] & PTE_P);
+}
+
 // Finds the smallest i from 0 to MAXFD-1 that doesn't have
 // its fd page mapped.
 // Sets *fd_store to the corresponding fd page virtual address.
@@ -50,10 +56,21 @@ fd2num(struct Fd *fd)
 int
 fd_alloc(struct Fd **fd_store)
 {
-	// LAB 5: Your code here.
+    // LAB 5: Your code here.
+    int i;
 
-	panic("fd_alloc not implemented");
-	return -E_MAX_OPEN;
+    assert(fd_store != 0);
+    *fd_store = 0;
+
+    for (i = 0; i < MAXFD; i++) {
+	if (!va_is_mapped(INDEX2FD(i))) {
+	    *fd_store = INDEX2FD(i);
+	    return 0;
+	}
+    }
+
+    return -E_MAX_OPEN;
+    //panic("fd_alloc not implemented");
 }
 
 // Check that fdnum is in range and mapped.
@@ -65,10 +82,24 @@ fd_alloc(struct Fd **fd_store)
 int
 fd_lookup(int fdnum, struct Fd **fd_store)
 {
-	// LAB 5: Your code here.
+    // LAB 5: Your code here.
+    struct Fd *fd;
 
-	panic("fd_lookup not implemented");
+    *fd_store = 0;
+
+    if (fdnum < 0 || fdnum > MAXFD)
 	return -E_INVAL;
+    
+    fd = INDEX2FD(fdnum);
+    if ((uintptr_t) fd < FDTABLE || (uintptr_t) fd >= FILEBASE)
+	return -E_INVAL;
+    
+    if (!va_is_mapped(fd))
+	return -E_INVAL;
+    
+    *fd_store = fd;
+    return 0;
+    //panic("fd_lookup not implemented");
 }
 
 // Frees file descriptor 'fd' by closing the corresponding file
@@ -300,3 +331,11 @@ stat(const char *path, struct Stat *stat)
 	return r;
 }
 
+
+
+
+
+
+/* Local Variables: */
+/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 870) (recenter-top-bottom)) */
+/* End: */

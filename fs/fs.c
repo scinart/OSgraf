@@ -76,14 +76,14 @@ read_block(uint32_t blockno, char **blk)
 
     // LAB 5: Your code here.
     r = map_block(blockno);
-    //cprintf("r79 is %d", r);
+
     if (r)
     {
     	return r;
     }
     addr = diskaddr(blockno);
     r = ide_read(blockno * BLKSECTS, addr, BLKSECTS);
-    //cprintf("r86 is %d", r);
+
     if (r)
 	return r;
 
@@ -749,5 +749,5 @@ file_remove(const char *path)
 
 
 /* Local Variables: */
-/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 4650) (recenter-top-bottom)) */
+/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 1831) (recenter-top-bottom)) */
 /* End: */
