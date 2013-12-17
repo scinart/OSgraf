@@ -210,7 +210,7 @@ read_super(void)
 		panic("cannot read superblock: %e", r);
 
 	super = (struct Super*) blk;
-//fixme: wtf?????????????
+
 	if (super->s_magic != FS_MAGIC)
 	{
 	    cprintf("super:s_magic is %d\n", super->s_magic);
@@ -749,5 +749,5 @@ file_remove(const char *path)
 
 
 /* Local Variables: */
-/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 1867) (recenter-top-bottom)) */
+/* eval:(progn (hs-minor-mode t) (let ((hs-state 'nil) (the-mark 'scinartspecialmarku2npbmfydfnwzwnpywxnyxjr)) (dolist (i hs-state) (if (car i) (progn (goto-char (car i)) (hs-find-block-beginning) (hs-hide-block-at-point nil nil))))) (goto-char 4650) (recenter-top-bottom)) */
 /* End: */
