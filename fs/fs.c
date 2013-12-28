@@ -69,30 +69,25 @@ read_block(uint32_t blockno, char **blk)
     char *addr;
 
     if (super && blockno >= super->s_nblocks)
-	panic("reading non-existent block %08x\n", blockno);
+        panic("reading non-existent block %08x\n", blockno);
 
     if (bitmap && block_is_free(blockno))
-	panic("reading free block %08x\n", blockno);
+        panic("reading free block %08x\n", blockno);
 
     // LAB 5: Your code here.
-    r = map_block(blockno);
-
-    if (r)
-    {
-    	return r;
-    }
     addr = diskaddr(blockno);
-    r = ide_read(blockno * BLKSECTS, addr, BLKSECTS);
-
-    if (r)
-	return r;
-
-    if (blk)
-	*blk = addr;
+	if (!block_is_mapped(blockno)) {
+		if ((r = map_block(blockno)) < 0)
+			panic("read_block: map_block: %e\n", r);
+		if ((r = ide_read(blockno * BLKSECTS, addr, BLKSECTS)) < 0)
+			panic("read_block: ide_read: %e\n", r);
+	}
+	if (blk)
+		*blk = addr;
+	return 0;
 
     //return sys_page_map(0, addr, 0, addr, vpt[VPN(addr)] & PTE_USER);
 //panic("read_block not implemented");
-    return 0;
 }
 
 // Copy the current contents of the block out to disk.
@@ -110,14 +105,15 @@ write_block(uint32_t blockno)
 	
     // Write the disk block and clear PTE_D.
     // LAB 5: Your code here.
-    addr = diskaddr(blockno);
-    r = ide_write(blockno * BLKSECTS, addr, BLKSECTS);
-    if (r)
-	panic("write_block(): ide_write() failed: %e\n", r);
 
-    r = sys_page_map(0, addr, 0, addr, vpt[VPN(addr)] & PTE_USER);
-    if (r)
-	panic("write_block(): sys_page_map() failed: %e\n", r);
+    addr = diskaddr (blockno) ;
+    if(block_is_dirty(blockno))
+    {
+        if ((r = ide_write(blockno * BLKSECTS, addr, BLKSECTS)))
+            panic("write_block(): ide_write() failed: %e\n", r);
+        if ((r = sys_page_map (0, addr, 0, addr, PTE_USER)))
+            panic("write_block(): sys_page_map() failed: %e\n", r);
+    }
     //panic("write_block not implemented");
 }
 
@@ -159,6 +155,15 @@ free_block(uint32_t blockno)
 	bitmap[blockno/32] |= 1<<(blockno%32);
 }
 
+// Mark a block not free in the bitmap
+void malloc_block(uint32_t blockno)
+{
+	// Blockno zero is the null pointer of block numbers.
+	if (blockno == 0)
+		panic("attempt to malloc used block");
+	bitmap[blockno/32] &= ~(1<<(blockno%32));
+}
+
 // Search the bitmap for a free block and allocate it.
 // 
 // Return block number allocated on success,
@@ -169,11 +174,11 @@ alloc_block_num(void)
     unsigned int i;
     // LAB 5: Your code here.
     for (i = 3; i <= super->s_nblocks; i++) {
-	if (bitmap[i / 32] & (1 << (i % 32))) {
-	    bitmap[i / 32] &= ~(1 << (i % 32));
-	    write_block((i / BLKBITSIZE) + 2);
-	    return i;
-	}
+        if (block_is_free(i)) {
+            malloc_block(i);
+            write_block((i / BLKBITSIZE) + 2);
+            return i;
+        }
     }
 
     return -E_NO_DISK;
@@ -431,22 +436,13 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
     // Read in the block, leaving the pointer in *blk.
     // Hint: Use file_map_block and read_block.
     // LAB 5: Your code here.
-    r = file_map_block(f, filebno, &diskbno, 1);
-    if (r)
-	return r;
 
-    // If the block is already mapped we return it
-    // instead of reading the block from disk again.
-    // XXX: I'm not sure whether this is the right
-    // thing to do, however, looks like lab5 says
-    // to do that (p. 7).
-    if (block_is_mapped(diskbno)) {
-	if (blk)
-	    *blk = diskaddr(diskbno);
+	if ((r = file_map_block(f, filebno, &diskbno, 1)) < 0)
+		return r;
+	if ((r = read_block(diskbno, blk)) < 0)
+		return r;
 	return 0;
-    }
 
-    return read_block(diskbno, blk);
     //panic("file_get_block not implemented");
     //return 0;
 }

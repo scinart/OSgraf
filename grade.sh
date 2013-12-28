@@ -13,7 +13,7 @@ else
 fi
 
 pts=5
-timeout=10
+timeout=4
 preservefs=n
 
 echo_n () {
