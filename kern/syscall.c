@@ -194,10 +194,10 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
     // LAB 4: Your code here. --test
 
     struct Env *env;
-    int err;
+    int r;
 
-    if ((err = envid2env(envid, &env, 1)) < 0)
-	return err;
+    if ((r = envid2env(envid, &env, 1)) < 0)
+        return r;
 
     env->env_pgfault_upcall = func;
     return 0;
@@ -512,6 +512,7 @@ static int sys_fs_wait()
         //IRQ+14 interruption isn't arrived.
         cprintf("waiting@@@---");
         //curenv->env_status=ENV_NOT_RUNNABLE;
+        //env_run(&envs[2]);
         //after trapdispatch sched_yield() will be called.
         return 0;
     }

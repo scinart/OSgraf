@@ -232,14 +232,16 @@ trap_dispatch(struct Trapframe *tf)
           //ss outb(IO_PIC2, 0x76);
           
           cprintf("IRQ_OFFSET 14 from disk\n");
-          if(envs[1].env_status==ENV_RUNNABLE)
+          //if(envs[1].env_status==ENV_RUNNABLE)
+          if(envs[1].env_parent_id>=0)
           {
               envs[1].env_parent_id++;
-              //cprintf("and i am in if@\n");
+              cprintf("in IF @\n");
           }
           else
           {
-              //cprintf("and i am in else@\n");
+              envs[1].env_parent_id++;
+              cprintf("IN ELSE@\n");
               envs[1].env_status=ENV_RUNNABLE;
               sched_yield();
               //env_run(&envs[1]);

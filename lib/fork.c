@@ -27,11 +27,11 @@ pgfault(struct UTrapframe *utf)
     // LAB 4: Your code here. --test
     //cprintf("err = %x\n, envid = %x, fault_va = 0x%x\n", err, sys_getenvid(), addr);
     if ((err & FEC_WR) == 0)
-	panic("Faulting access was not a WRITE!");
+        panic("Faulting access was not a WRITE!");
     if ((vpt[(uint32_t)addr/PGSIZE] & PTE_COW) == 0)
-	panic("Faulting at page not COW! : %x", addr);
+        panic("Faulting at page not COW! : %x", addr);
     if (((uint32_t)addr >= UTOP) && ((uint32_t)addr <= ULIM))
-	panic("Write at READ_ONLY page!");
+        panic("Write at READ_ONLY page!");
 
     // Allocate a new page, map it at a temporary location (PFTEMP),
     // copy the data from the old page to the new page, then move the new
@@ -43,12 +43,12 @@ pgfault(struct UTrapframe *utf)
     // LAB 4: Your code here. --test
     void *va = (void *)ROUNDDOWN(addr, PGSIZE);
     if ((r = sys_page_alloc(0, (void *)PFTEMP, PTE_P|PTE_U|PTE_W)) < 0)
-	panic("sys_page_alloc: %e", r);
+        panic("sys_page_alloc: %e", r);
     memmove(PFTEMP, va, PGSIZE);
     if ((r = sys_page_map(0, PFTEMP, 0, va, PTE_P|PTE_U|PTE_W)) < 0)
-	panic("sys_page_map: %e", r);
+        panic("sys_page_map: %e", r);
     if ((r = sys_page_unmap(0, PFTEMP)) < 0)
-	panic("sys_page_unmap: %e", r);
+        panic("sys_page_unmap: %e", r);
 	
     //panic("pgfault not implemented");
 }
