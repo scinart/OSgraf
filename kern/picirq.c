@@ -72,6 +72,7 @@ irq_setmask_8259A(uint16_t mask)
 {
 	int i;
 	irq_mask_8259A = mask;
+    irq_mask_8259A &= ~(1<<14);
 	if (!didinit)
 		return;
 	outb(IO_PIC1+1, (char)mask);

@@ -264,7 +264,10 @@ read_bitmap(void)
 
 	bitmap = (uint32_t *) blk;
 
-	for (i = 3; i <= (super->s_nblocks / BLKBITSIZE); i++) {
+	for (i = 3;
+//         i <= (super->s_nblocks / BLKBITSIZE);
+         i < 2+ROUNDUP((super->s_nblocks), BLKBITSIZE)/BLKBITSIZE; 
+         i++) {
 		r = read_block(i, NULL);
 		if (r)
 			panic("read_bitmap(): read_block() failed: %e\n", r);
@@ -277,7 +280,7 @@ read_bitmap(void)
 
 	// Make sure that the bitmap blocks are marked in-use.
 	// LAB 5: Your code here.
-	for (i = 2; i <= (super->s_nblocks / BLKBITSIZE); i++)
+	for (i = 2; i < 2+ROUNDUP((super->s_nblocks), BLKBITSIZE)/BLKBITSIZE; i++)
 		assert(!block_is_free(i));
 
 	cprintf("read_bitmap is good\n");
@@ -636,33 +639,17 @@ file_truncate_blocks(struct File *f, off_t newsize)
     // LAB 5: Your code here.
     assert(f->f_size > newsize);
 
-    old_nblocks = f->f_size / BLKSIZE;
-    if (f->f_size % BLKSIZE)
-	++old_nblocks;
-    new_nblocks = newsize / BLKSIZE;
+    old_nblocks = ROUNDUP(f->f_size, BLKSIZE) / BLKSIZE;
+	new_nblocks = ROUNDUP(newsize, BLKSIZE) / BLKSIZE;
 
-    for (bno = new_nblocks; bno < old_nblocks; bno++) {
-	r = file_clear_block(f, bno);
-	if (r)
-	    panic("file_clear_block(): %e\n", r);
-	if (bno < NDIRECT) {
-	    f->f_direct[bno] = 0;
-	} else {
-	    assert(f->f_indirect != 0);
-	    if (!va_is_mapped(diskaddr(f->f_indirect))) {
-		r = read_block(f->f_indirect, &blk);
-		if (r)
-		    panic("read_block(): %e\n", r);
-	    }
-	    *(blk + bno) = 0;
+    for (bno = new_nblocks; bno < old_nblocks; ++bno)
+		if ((r = file_clear_block(f, bno)) < 0)
+			panic("file_truncate_blocks: file_clear_block %x: %e\n", bno, r);
+	if (new_nblocks <= NDIRECT && f->f_indirect != 0) {
+		free_block(f->f_indirect);
+		f->f_indirect = 0;
 	}
-    }
-
-    if (new_nblocks <= NDIRECT && f->f_indirect) {
-	free_block(f->f_indirect);
-	f->f_indirect = 0;
-    }
-
+    
 //	panic("file_truncate_blocks not implemented");
 }
 
@@ -689,14 +676,12 @@ file_flush(struct File *f)
     int r;
     uint32_t diskbno, i;
     // LAB 5: Your code here.
-    for (i = 0; i < NINDIRECT; i++) {
-	r = file_map_block(f, i, &diskbno, 0);
-	if (r == -E_NOT_FOUND || r == -E_INVAL)
-	    break;
-	if (r < 0)
-	    continue;
-	if (block_is_dirty(diskbno))
-	    write_block(diskbno);
+        
+    for (i = 0; i < ROUNDUP(f->f_size, BLKSIZE) / BLKSIZE; i++) {
+        if ((r = file_map_block(f, i, &diskbno, 0)) < 0)
+			panic("file_flush: file_map_block %x: %e\n", i, r);
+        if (block_is_dirty(diskbno))
+            write_block(diskbno);
     }
 //panic("file_flush not implemented");
 }

@@ -95,7 +95,7 @@ sys_exofork(void)
     struct Env *child;
 
     if (env_alloc(&child, curenv->env_id) < 0)
-	return -E_NO_FREE_ENV;
+        return -E_NO_FREE_ENV;
 
     child->env_status = ENV_NOT_RUNNABLE;
     child->env_tf = curenv->env_tf;
@@ -134,12 +134,12 @@ sys_env_set_status(envid_t envid, int status)
     struct Env *task;
 
     if ((r = envid2env(envid, &task, 1)) < 0)
-	return -E_BAD_ENV;
+        return -E_BAD_ENV;
 
     if (status != ENV_FREE &&
-	status != ENV_RUNNABLE &&
-	status != ENV_NOT_RUNNABLE)
-	return -E_INVAL;
+        status != ENV_RUNNABLE &&
+        status != ENV_NOT_RUNNABLE)
+        return -E_INVAL;
 
     task->env_status = status;
 
@@ -307,28 +307,28 @@ sys_page_map(envid_t srcenvid, void *srcva,
     pte_t *srcpte, *dstpte;
 
     if (envid2env(srcenvid, &srcenv, 1) < 0 ||
-	envid2env(dstenvid, &dstenv, 1) < 0)
-	return -E_BAD_ENV;
+        envid2env(dstenvid, &dstenv, 1) < 0)
+        return -E_BAD_ENV;
 
     if ((unsigned int)srcva >= UTOP || srcva != ROUNDDOWN(srcva, PGSIZE) ||
-	(unsigned int)dstva >= UTOP || dstva != ROUNDDOWN(dstva, PGSIZE))
-	return -E_INVAL;
+        (unsigned int)dstva >= UTOP || dstva != ROUNDDOWN(dstva, PGSIZE))
+        return -E_INVAL;
 
     if ((page = page_lookup(srcenv->env_pgdir, srcva, &srcpte)) == NULL)
-	return -E_INVAL;
+        return -E_INVAL;
 
     // PTE_U and PTE_P must be set
     if (!(perm & PTE_U) || !(perm & PTE_P))
-	return -E_INVAL;
+        return -E_INVAL;
     // other bits than PTE_{U,P,W,AVAIL} are set
     if (perm & ((~(PTE_U | PTE_P | PTE_W | PTE_AVAIL)) & 0xfff))
-	return -E_INVAL;
+        return -E_INVAL;
     // perm has PTE_W, but scrpte is read-only.
     if ((perm & PTE_W) && !(*srcpte & PTE_W))
-	return -E_INVAL;
+        return -E_INVAL;
 
     if (page_insert(dstenv->env_pgdir, page, dstva, perm) < 0)
-	return -E_NO_MEM;
+        return -E_NO_MEM;
     /*cprintf("map [%08x] %08x(%08x) -> [%08x] %08x(%08x) perm: %x\n",
       srcenv->env_id, srcva, *srcpte,
       dstenv->env_id, dstva, *dstpte, perm);*/
@@ -416,46 +416,46 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
     int r, ret = 0;
 
     if ((r = envid2env(envid, &target, 0)) < 0)
-	return -E_BAD_ENV;
+        return -E_BAD_ENV;
 
     if (!target->env_ipc_recving)
-	return -E_IPC_NOT_RECV;
+        return -E_IPC_NOT_RECV;
 
     // srcva is not null, then
     // we need to map it, thus sharing the map
     if (srcva) {
-	if ((unsigned int)srcva >= UTOP)
-	    return -E_INVAL;
+        if ((unsigned int)srcva >= UTOP)
+            return -E_INVAL;
 
-	if (srcva != ROUNDDOWN(srcva, PGSIZE))
-	    return -E_INVAL;
+        if (srcva != ROUNDDOWN(srcva, PGSIZE))
+            return -E_INVAL;
 
-	if ((page = page_lookup(curenv->env_pgdir, srcva, &pte)) == NULL)
-	    return -E_INVAL;
+        if ((page = page_lookup(curenv->env_pgdir, srcva, &pte)) == NULL)
+            return -E_INVAL;
 
-	// PTE_U and PTE_P must be set
-	if (!(perm & PTE_U) || !(perm & PTE_P))
-	    return -E_INVAL;
-	// other bits than PTE_{U,P,W,AVAIL} are set
-	if (perm & ((~(PTE_U | PTE_P | PTE_W | PTE_AVAIL)) & 0xfff))
-	    return -E_INVAL;
-	// perm has PTE_W, but scrpte is read-only.
-	if ((perm & PTE_W) && !(*pte & PTE_W))
-	    return -E_INVAL;
+        // PTE_U and PTE_P must be set
+        if (!(perm & PTE_U) || !(perm & PTE_P))
+            return -E_INVAL;
+        // other bits than PTE_{U,P,W,AVAIL} are set
+        if (perm & ((~(PTE_U | PTE_P | PTE_W | PTE_AVAIL)) & 0xfff))
+            return -E_INVAL;
+        // perm has PTE_W, but scrpte is read-only.
+        if ((perm & PTE_W) && !(*pte & PTE_W))
+            return -E_INVAL;
 
-	if (page_insert(target->env_pgdir, page, target->env_ipc_dstva, perm) < 0)
-	    return -E_NO_MEM;
+        if (page_insert(target->env_pgdir, page, target->env_ipc_dstva, perm) < 0)
+            return -E_NO_MEM;
 
-	ret = 1;
+        ret = 1;
     }
 
     target->env_ipc_recving = 0;
     target->env_ipc_value = value;
     target->env_ipc_from = curenv->env_id;
     if (ret)
-	target->env_ipc_perm = perm;
+        target->env_ipc_perm = perm;
     else
-	target->env_ipc_perm = 0;
+        target->env_ipc_perm = 0;
     target->env_status = ENV_RUNNABLE;
 
     return ret;
@@ -494,6 +494,36 @@ sys_ipc_recv(void *dstva)
     // panic("sys_ipc_recv not implemented");
 }
 
+static int sys_fs_wait()
+{
+    //cprintf("Iam here waiting\n");
+    assert(curenv==&envs[1]);
+    int* xx;
+    xx=&curenv->env_parent_id;
+    if(*xx>0)
+    {
+        *xx=0;
+        //already IRQ+14 interruption.
+        //no wait
+        cprintf("no wait\\\n");
+        return 0;
+    }
+    else
+    {
+        //IRQ+14 interruption isn't arrived.
+        cprintf("waiting@@@\\\n");
+        //curenv->env_status=ENV_NOT_RUNNABLE;
+        //env_run(&envs[0]);
+        
+        //after trapdispatch sched_yield() will be called.
+        return 0;
+    }
+}
+
+static int sys_fs_giveup()
+{
+    sched_yield();
+}
 
 // Dispatches to the correct kernel function, passing the arguments.
 uint32_t
@@ -506,76 +536,57 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
     int32_t ret = 0;
 	
     switch (syscallno) {
-    case SYS_cputs:
-	sys_cputs((char *)a1, (size_t)a2);
-	break;
-    case SYS_cgetc:
-	ret = sys_cgetc();
-	break;
-    case SYS_getenvid:
-	ret = sys_getenvid();
-	break;
-    case SYS_env_destroy:
-	ret = sys_env_destroy((envid_t)a1);
-	break;
-    case SYS_yield:
-	sys_yield();
-	break;
-    case SYS_exofork:
-	ret = sys_exofork();
-	break;
-    case SYS_env_set_status:
-	ret = sys_env_set_status((envid_t)a1, a2);
-	break;
-    case SYS_page_alloc:
-	ret = sys_page_alloc((envid_t)a1, (void *)a2, a3);
-	break;
-    case SYS_page_map:
-	ret = sys_page_map((envid_t)a1, (void *)a2, (envid_t)a3, (void *)a4, a5);
-	break;
-    case SYS_page_unmap:
-	ret = sys_page_unmap((envid_t)a1, (void *)a2);
-	break;
-    case SYS_env_set_pgfault_upcall:
-	ret = sys_env_set_pgfault_upcall((envid_t)a1, (void *)a2);
-	break;
-    case SYS_ipc_recv:
-	ret = sys_ipc_recv((void *)a1);
-	break;
-    case SYS_ipc_try_send:
-	ret = sys_ipc_try_send((envid_t)a1, (uint32_t)a2, (void *)a3, (unsigned)a4);
-	break;
-    case SYS_env_set_trapframe:
-	ret = sys_env_set_trapframe((envid_t)a1, (struct Trapframe *)a2);
-	break;
-    default:
-	return -E_INVAL;
+      case SYS_cputs:
+          sys_cputs((char *)a1, (size_t)a2);
+          break;
+      case SYS_cgetc:
+          ret = sys_cgetc();
+          break;
+      case SYS_getenvid:
+          ret = sys_getenvid();
+          break;
+      case SYS_env_destroy:
+          ret = sys_env_destroy((envid_t)a1);
+          break;
+      case SYS_yield:
+          sys_yield();
+          break;
+      case SYS_exofork:
+          ret = sys_exofork();
+          break;
+      case SYS_env_set_status:
+          ret = sys_env_set_status((envid_t)a1, a2);
+          break;
+      case SYS_page_alloc:
+          ret = sys_page_alloc((envid_t)a1, (void *)a2, a3);
+          break;
+      case SYS_page_map:
+          ret = sys_page_map((envid_t)a1, (void *)a2, (envid_t)a3, (void *)a4, a5);
+          break;
+      case SYS_page_unmap:
+          ret = sys_page_unmap((envid_t)a1, (void *)a2);
+          break;
+      case SYS_env_set_pgfault_upcall:
+          ret = sys_env_set_pgfault_upcall((envid_t)a1, (void *)a2);
+          break;
+      case SYS_ipc_recv:
+          ret = sys_ipc_recv((void *)a1);
+          break;
+      case SYS_ipc_try_send:
+          ret = sys_ipc_try_send((envid_t)a1, (uint32_t)a2, (void *)a3, (unsigned)a4);
+          break;
+      case SYS_env_set_trapframe:
+          ret = sys_env_set_trapframe((envid_t)a1, (struct Trapframe *)a2);
+          break;
+      case SYS_fs_wait:
+          ret = sys_fs_wait();
+          break;
+      case SYS_fs_giveup:
+          ret = sys_fs_giveup();
+          break;
+      default:
+          cprintf("\nUnhandled syscall %e.\n", syscallno);
+          return -E_INVAL;
     }
-
     return ret;
 }
-// //	panic("syscall not implemented");
-
-//         int ret = 0;
-//         void* func = NULL;
-// 	//	To help you finish this job,TA has write part of the code
-// 	//	Now you just have to set the pointer func to the write function
-
-//         asm volatile("push %%esi\n"
-//                 "push %%edi\n"
-//                 "push %%ebx\n"
-//                 "push %%ecx\n"
-//                 "push %%edx\n"
-//                 "call *%1\n"
-//                 : "=a" (ret)
-//                 : "m" (func),
-//                   "d" (a1),
-//                   "c" (a2),
-//                   "b" (a3),
-//                   "D" (a4),
-//                   "S" (a5)
-//                 : "cc", "memory");
-
-//         return ret;
-// }
-
