@@ -498,23 +498,20 @@ static int sys_fs_wait()
 {
     //cprintf("Iam here waiting\n");
     assert(curenv==&envs[1]);
-    int* xx;
-    xx=&curenv->env_parent_id;
-    if(*xx>0)
+    int xx;
+    xx=curenv->env_parent_id--;
+    if(xx>0)
     {
-        *xx=0;
         //already IRQ+14 interruption.
         //no wait
-        cprintf("no wait\\\n");
+        cprintf("no wait @@@ \n");
         return 0;
     }
     else
     {
         //IRQ+14 interruption isn't arrived.
-        cprintf("waiting@@@\\\n");
+        cprintf("waiting@@@---");
         //curenv->env_status=ENV_NOT_RUNNABLE;
-        //env_run(&envs[0]);
-        
         //after trapdispatch sched_yield() will be called.
         return 0;
     }

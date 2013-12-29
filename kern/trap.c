@@ -27,34 +27,34 @@ struct Pseudodesc idt_pd = {
 static const char *trapname(int trapno)
 {
     static const char * const excnames[] = {
-	"Divide error",
-	"Debug",
-	"Non-Maskable Interrupt",
-	"Breakpoint",
-	"Overflow",
-	"BOUND Range Exceeded",
-	"Invalid Opcode",
-	"Device Not Available",
-	"Double Falt",
-	"Coprocessor Segment Overrun",
-	"Invalid TSS",
-	"Segment Not Present",
-	"Stack Fault",
-	"General Protection",
-	"Page Fault",
-	"(unknown trap)",
-	"x87 FPU Floating-Point Error",
-	"Alignment Check",
-	"Machine-Check",
-	"SIMD Floating-Point Exception"
+        "Divide error",
+        "Debug",
+        "Non-Maskable Interrupt",
+        "Breakpoint",
+        "Overflow",
+        "BOUND Range Exceeded",
+        "Invalid Opcode",
+        "Device Not Available",
+        "Double Falt",
+        "Coprocessor Segment Overrun",
+        "Invalid TSS",
+        "Segment Not Present",
+        "Stack Fault",
+        "General Protection",
+        "Page Fault",
+        "(unknown trap)",
+        "x87 FPU Floating-Point Error",
+        "Alignment Check",
+        "Machine-Check",
+        "SIMD Floating-Point Exception"
     };
 
     if (trapno < sizeof(excnames)/sizeof(excnames[0]))
-	return excnames[trapno];
+        return excnames[trapno];
     if (trapno == T_SYSCALL)
-	return "System call";
+        return "System call";
     if (trapno >= IRQ_OFFSET && trapno < IRQ_OFFSET + 16)
-	return "Hardware Interrupt";
+        return "Hardware Interrupt";
     return "(unknown trap)";
 }
 
@@ -198,41 +198,67 @@ trap_dispatch(struct Trapframe *tf)
     struct PushRegs *regs;        
     switch (tf->tf_trapno) 
     {
-    case T_SYSCALL:
-	regs = &(tf->tf_regs);
-	regs->reg_eax = syscall(regs->reg_eax, regs->reg_edx,
-			       regs->reg_ecx, regs->reg_ebx, regs->reg_edi, regs->reg_esi);
-	return;
-    case T_PGFLT:
-	page_fault_handler(tf);
-	return;
-    case T_BRKPT:
-	monitor(tf);
-	return;
-    case T_DEBUG:
-	monitor(tf);
-	return;
-    case IRQ_OFFSET: //!!!!!!!!!!!!!!!!!!!!!
-	// clock interrupt
-	sched_yield();
-	break;
-    case IRQ_OFFSET + 1:
-	kbd_intr();
-	return;
-    }
+      case T_SYSCALL:
+          regs = &(tf->tf_regs);
+          regs->reg_eax = syscall(regs->reg_eax, regs->reg_edx,
+                                 regs->reg_ecx, regs->reg_ebx, regs->reg_edi, regs->reg_esi);
+          return;
+      case T_PGFLT:
+          page_fault_handler(tf);
+          return;
+      case T_BRKPT:
+          monitor(tf);
+          return;
+      case T_DEBUG:
+          monitor(tf);
+          return;
+      case IRQ_OFFSET: //!!!!!!!!!!!!!!!!!!!!!
+          // clock interrupt
+          sched_yield();
+          break;
+      case IRQ_OFFSET + 1:
+          kbd_intr();
+          return;
+      case IRQ_OFFSET + 14:
+          //outb(IO_PIC2, 0x68);
+          //outb(IO_PIC2, 0x20);
+          //no outb(IO_PIC2, 0x06);
+          //single mode not supported outb(IO_PIC2, 0x16);
+          //no outb(IO_PIC2, 0x26);
+          //ss outb(IO_PIC2, 0x36);
+          //no outb(IO_PIC2, 0x46);
+          //ss outb(IO_PIC2, 0x56);
+          outb(IO_PIC2, 0x66);
+          //ss outb(IO_PIC2, 0x76);
+          
+          cprintf("IRQ_OFFSET 14 from disk\n");
+          if(envs[1].env_status==ENV_RUNNABLE)
+          {
+              envs[1].env_parent_id++;
+              //cprintf("and i am in if@\n");
+          }
+          else
+          {
+              //cprintf("and i am in else@\n");
+              envs[1].env_status=ENV_RUNNABLE;
+              sched_yield();
+              //env_run(&envs[1]);
+          }
+          break;
 
-    // Unexpected trap: The user process or the kernel has a bug.
-    cprintf("unhandled trap_dispatch trap.c: no: %d\n",tf->tf_trapno);
-    print_trapframe(tf);
-    if (tf->tf_cs == GD_KT)
-	panic("unhandled trap in kernel");
-    else 
-    {
-	env_destroy(curenv);
-	return;
+      default:
+          // Unexpected trap: The user process or the kernel has a bug.
+          cprintf("unhandled trap_dispatch trap.c: no: %d\n",tf->tf_trapno);
+          print_trapframe(tf);
+          if (tf->tf_cs == GD_KT)
+              panic("unhandled trap in kernel");
+          else 
+          {
+              env_destroy(curenv);
+              return;
+          }
     }
 }
-
 void
 trap(struct Trapframe *tf)
 {
@@ -256,9 +282,9 @@ trap(struct Trapframe *tf)
     // scheduled, so we should return to the current envi
     // if doing so makes sense.
     if (curenv && curenv->env_status == ENV_RUNNABLE)
-	env_run(curenv);
+        env_run(curenv);
     else
-	sched_yield();
+        sched_yield();
 }
 
 
@@ -273,11 +299,11 @@ page_fault_handler(struct Trapframe *tf)
     // LAB 3: Your code here. --done
     if(tf->tf_cs == GD_KT) //aka ((tf->tf_cs & 3) == 0)
     {
-	// trapped from kernel mode
-	// and we are in trouble...
-	cprintf("kernel fault va %08x ip %08x\n", fault_va, tf->tf_eip);
-	panic("kern/trap.c/page_fault_handler: kernel page fault!\n"); 
-	return;
+        // trapped from kernel mode
+        // and we are in trouble...
+        cprintf("kernel fault va %08x ip %08x\n", fault_va, tf->tf_eip);
+        panic("kern/trap.c/page_fault_handler: kernel page fault!\n"); 
+        return;
     }
 
     // LAB 3: Your code here. --done
@@ -317,20 +343,20 @@ page_fault_handler(struct Trapframe *tf)
     // Destroy the environment that caused the fault,
     // if 'env_pgfault_upcall' is null
     if (!curenv->env_pgfault_upcall) {
-	cprintf("no page fault handler installed.\n");
-	cprintf("[%08x] user fault va %08x ip %08x\n",
-		curenv->env_id, fault_va, tf->tf_eip);
-	print_trapframe(tf);
-	env_destroy(curenv);
-	return;
+        cprintf("no page fault handler installed.\n");
+        cprintf("[%08x] user fault va %08x ip %08x\n",
+                curenv->env_id, fault_va, tf->tf_eip);
+        print_trapframe(tf);
+        env_destroy(curenv);
+        return;
     }
     // check whether the user exception stack is accessible
     user_mem_assert(curenv, (void *)(UXSTACKTOP-4), 4,
-		    PTE_P | PTE_W | PTE_U);
+                    PTE_P | PTE_W | PTE_U);
     // added according to 'faultbadhandler' to check whether
     // the page fault installed is accessible to the user
     user_mem_assert(curenv, (void *)(curenv->env_pgfault_upcall), 4,
-		    PTE_P | PTE_U);
+                    PTE_P | PTE_U);
     // initialize the utf according to tf
     utf.utf_fault_va = fault_va;
     utf.utf_err = tf->tf_err;
@@ -341,19 +367,19 @@ page_fault_handler(struct Trapframe *tf)
 
     // tf->tf_esp is already on the user exception stack
     if (tf->tf_esp >= UXSTACKTOP-PGSIZE && tf->tf_esp < UXSTACKTOP)
-	// push an empty 32-bit word
-	tf->tf_esp -= 4;
+        // push an empty 32-bit word
+        tf->tf_esp -= 4;
     else
-	tf->tf_esp = UXSTACKTOP;
+        tf->tf_esp = UXSTACKTOP;
     // push user trap frame
     tf->tf_esp -= sizeof(struct UTrapframe);
     if (tf->tf_esp < UXSTACKTOP-PGSIZE) {
-	cprintf("user exception stack overflowed.\n");
-	cprintf("[%08x] user fault va %08x ip %08x\n",
-		curenv->env_id, fault_va, tf->tf_eip);
-	print_trapframe(tf);
-	env_destroy(curenv);
-	return;
+        cprintf("user exception stack overflowed.\n");
+        cprintf("[%08x] user fault va %08x ip %08x\n",
+                curenv->env_id, fault_va, tf->tf_eip);
+        print_trapframe(tf);
+        env_destroy(curenv);
+        return;
     }
     *(struct UTrapframe *)(tf->tf_esp) = utf;
 

@@ -114,3 +114,11 @@ sys_ipc_recv(void *dstva)
 	return syscall(SYS_ipc_recv, (uint32_t) dstva, 0, 0, 0, 0);
 }
 
+int sys_fs_wait(void)
+{
+    return syscall(SYS_fs_wait,0,0,0,0,0);
+}
+int sys_fs_giveup()
+{
+    return syscall(SYS_fs_giveup,0,0,0,0,0);
+}
