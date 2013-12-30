@@ -63,10 +63,10 @@ fd_alloc(struct Fd **fd_store)
     *fd_store = 0;
 
     for (i = 0; i < MAXFD; i++) {
-	if (!va_is_mapped(INDEX2FD(i))) {
-	    *fd_store = INDEX2FD(i);
-	    return 0;
-	}
+        if (!va_is_mapped(INDEX2FD(i))) {
+            *fd_store = INDEX2FD(i);
+            return 0;
+        }
     }
 
     return -E_MAX_OPEN;
@@ -88,14 +88,14 @@ fd_lookup(int fdnum, struct Fd **fd_store)
     *fd_store = 0;
 
     if (fdnum < 0 || fdnum > MAXFD)
-	return -E_INVAL;
+        return -E_INVAL;
     
     fd = INDEX2FD(fdnum);
     if ((uintptr_t) fd < FDTABLE || (uintptr_t) fd >= FILEBASE)
-	return -E_INVAL;
+        return -E_INVAL;
     
     if (!va_is_mapped(fd))
-	return -E_INVAL;
+        return -E_INVAL;
     
     *fd_store = fd;
     return 0;

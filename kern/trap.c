@@ -217,7 +217,7 @@ trap_dispatch(struct Trapframe *tf)
           sched_yield();
           break;
       case IRQ_OFFSET + 1:
-          kbd_intr();
+          //kbd_intr();
           return;
       case IRQ_OFFSET + 14:
           //outb(IO_PIC2, 0x68);
@@ -231,7 +231,7 @@ trap_dispatch(struct Trapframe *tf)
           outb(IO_PIC2, 0x66);
           //ss outb(IO_PIC2, 0x76);
           
-          cprintf("IRQ_OFFSET 14 from disk\n");
+          cprintf("IRQ_OFFSET 14 from dis    ");
           //if(envs[1].env_status==ENV_RUNNABLE)
           if(envs[1].env_parent_id>=0)
           {

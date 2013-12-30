@@ -264,10 +264,8 @@ read_bitmap(void)
 
 	bitmap = (uint32_t *) blk;
 
-	for (i = 3;
-//         i <= (super->s_nblocks / BLKBITSIZE);
-         i < 2+ROUNDUP((super->s_nblocks), BLKBITSIZE)/BLKBITSIZE; 
-         i++) {
+    int bitmap_end_block = 2+ROUNDUP((super->s_nblocks), BLKBITSIZE)/BLKBITSIZE; 
+	for (i = 3; i < bitmap_end_block; i++) {
 		r = read_block(i, NULL);
 		if (r)
 			panic("read_bitmap(): read_block() failed: %e\n", r);
@@ -280,7 +278,7 @@ read_bitmap(void)
 
 	// Make sure that the bitmap blocks are marked in-use.
 	// LAB 5: Your code here.
-	for (i = 2; i < 2+ROUNDUP((super->s_nblocks), BLKBITSIZE)/BLKBITSIZE; i++)
+	for (i = 2; i < bitmap_end_block; i++)
 		assert(!block_is_free(i));
 
 	cprintf("read_bitmap is good\n");
@@ -676,14 +674,12 @@ file_flush(struct File *f)
     int r;
     uint32_t diskbno, i;
     // LAB 5: Your code here.
-        
     for (i = 0; i < ROUNDUP(f->f_size, BLKSIZE) / BLKSIZE; i++) {
         if ((r = file_map_block(f, i, &diskbno, 0)) < 0)
 			panic("file_flush: file_map_block %x: %e\n", i, r);
         if (block_is_dirty(diskbno))
             write_block(diskbno);
     }
-//panic("file_flush not implemented");
 }
 
 // Sync the entire file system.  A big hammer.
